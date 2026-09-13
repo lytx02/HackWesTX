@@ -1,0 +1,21 @@
+# /etc/systemd/system/campus-ai-api.service
+#
+# Runs the Express API as a service so it survives reboots and restarts on crash.
+# Expects the repo cloned at /opt/campus-ai with server/.env filled in.
+
+[Unit]
+Description=Campus AI API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/campus-ai/server
+EnvironmentFile=/opt/campus-ai/server/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=3
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
