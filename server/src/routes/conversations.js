@@ -4,7 +4,8 @@ import { db } from '../db.js';
 import { assignments, classes, conversations, enrollments, messages } from '../schema.js';
 import { requireUser } from '../auth.js';
 import { buildSystemPrompt, getAgentSettings, reply, replyStream } from '../agent.js';
-import { errorPayload, isUuid, notFound, requireString, wrap } from '../http.js';
+import { badRequest, errorPayload, isUuid, notFound, requireString, wrap } from '../http.js';
+import { imageUrls, messageWithAttachments, parseAttachments, withAttachmentText } from '../attachments.js';
 import { openSse } from '../sse.js';
 import { withUsageBudget } from '../usage.js';
 import { requireMember } from './classes.js';
@@ -63,15 +64,25 @@ conversationsRouter.patch(
 // untitled chat, and assemble everything the model needs.
 async function startTurn(req) {
   const { c, cls } = await loadOwned(req);
-  const body = requireString(req.body, 'body', { max: 4000 });
+  // A message may be text, files, or both.
+  const attachments = await parseAttachments(req.body?.attachments);
+  const body = attachments.length
+    ? typeof req.body?.body === 'string'
+      ? req.body.body.trim().slice(0, 4000)
+      : ''
+    : requireString(req.body, 'body', { max: 4000 });
+  if (!body && !attachments.length) throw badRequest('Type a message or attach a file');
 
   const history = await db.select().from(messages).where(eq(messages.conversationId, c.id)).orderBy(asc(messages.createdAt));
-  const [userMsg] = await db.insert(messages).values({ conversationId: c.id, sender: 'user', body }).returning();
+  const [userMsg] = await db
+    .insert(messages)
+    .values({ conversationId: c.id, sender: 'user', body, attachments: attachments.length ? attachments : null })
+    .returning();
 
   // An untitled conversation takes its title from the first user message.
   let title = c.title;
   if (c.title === DEFAULT_TITLE && !history.some((m) => m.sender === 'user')) {
-    title = body.slice(0, 60);
+    title = (body || attachments[0].name).slice(0, 60);
     await db.update(conversations).set({ title }).where(eq(conversations.id, c.id));
   }
 
@@ -90,7 +101,17 @@ async function startTurn(req) {
 
   const settings = await getAgentSettings();
   const systemPrompt = buildSystemPrompt(settings.basePrompt, cls, upcoming);
-  return { c, cls, title, userMsg, history, upcoming, systemPrompt, message: body };
+  return {
+    c,
+    cls,
+    title,
+    userMsg,
+    history: history.map(withAttachmentText),
+    upcoming,
+    systemPrompt,
+    message: messageWithAttachments(body, attachments),
+    images: imageUrls(attachments),
+  };
 }
 
 const storeAgentMessage = (conversationId, body, usage = null) =>

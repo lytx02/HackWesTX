@@ -21,7 +21,8 @@
     "drizzle-orm": "^0.36.4",
     "express": "^4.21.1",
     "express-oauth2-jwt-bearer": "^1.10.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "drizzle-kit": "^0.28.1"

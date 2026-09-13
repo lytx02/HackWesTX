@@ -289,3 +289,8 @@ textarea.input { resize: vertical; font-family: var(--font-ui); }
 .agent-attachments { display: flex; flex-wrap: wrap; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm) 0; }
 .agent-attachments .chip { display: inline-flex; align-items: center; gap: 4px; }
 .chip-remove { border: none; background: transparent; color: inherit; cursor: pointer; padding: 0; font-size: 1rem; line-height: 1; }
+
+/* Attachments inside messages --------------------------------------------- */
+.msg-attachments { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: 6px; }
+.msg-image { display: block; max-width: 100%; max-height: 240px; border-radius: var(--radius-sm); }
+.msg.user .chip { background: color-mix(in srgb, var(--color-primaryText) 18%, transparent); color: inherit; }

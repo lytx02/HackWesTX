@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { keys } from '../api/hooks.js';
 import { streamHelper } from '../api/stream.js';
 
-// Reusable chat surface. Messages are { who: 'user' | 'agent', text, streaming? }.
+// Reusable chat surface. Messages are { who: 'user' | 'agent', text, streaming?, attachments? }.
+// attachments: [{name, type, size, dataUrl?}] shown under the text (images inline).
 //
 // Controlled mode (persisted class chats): pass `messages` and `onSend(text)`;
 // the caller streams the reply into its own store and the log re-renders as
@@ -27,6 +28,44 @@ export function describeChatError(err) {
   return err?.message ?? 'Something went wrong';
 }
 
+const MAX_FILES = 4;
+const MAX_FILE_MB = 10;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
+// File -> {name, type, size, data (base64 without the data: prefix)} for the API.
+function encodeFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, type: file.type, size: file.size, data: String(reader.result).split(',')[1] ?? '' });
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
+// What the log shows for a just-sent file (images preview from an object URL).
+const previewOf = (file) => ({
+  name: file.name,
+  type: file.type,
+  size: file.size,
+  dataUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+});
+
+function MessageAttachments({ items }) {
+  return (
+    <div className="msg-attachments">
+      {items.map((a, i) =>
+        a.dataUrl && a.type?.startsWith('image/') ? (
+          <img key={`${a.name}-${i}`} className="msg-image" src={a.dataUrl} alt={a.name} />
+        ) : (
+          <span key={`${a.name}-${i}`} className="chip">
+            📎 {a.name}
+          </span>
+        )
+      )}
+    </div>
+  );
+}
+
 export default function AgentChat({
   greeting,
   placeholder = 'Ask for help...',
@@ -39,25 +78,31 @@ export default function AgentChat({
   const [local, setLocal] = useState(greeting ? [{ who: 'agent', text: greeting }] : []);
   // The user's text shown optimistically until the server echoes it back
   // (controlled mode adds it to `messages` on the `user` event).
-  const [pending, setPending] = useState(null); // { text, baseLen }
+  const [pending, setPending] = useState(null); // { text, attachments, baseLen }
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
-  // Attachments picked with the + button (images / PDFs). Not sent anywhere yet.
+  // Attachments picked with the + button (images / PDFs), sent base64 with the message.
   const fileRef = useRef(null);
   const [files, setFiles] = useState([]);
 
   const addFiles = (e) => {
-    setFiles((f) => [...f, ...Array.from(e.target.files ?? [])]);
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = ''; // allow picking the same file again
+    const tooBig = picked.find((f) => f.size > MAX_FILE_BYTES);
+    if (tooBig) return setError(`${tooBig.name} is over ${MAX_FILE_MB} MB`);
+    setError(null);
+    setFiles((f) => [...f, ...picked].slice(0, MAX_FILES));
   };
   const removeFile = (i) => setFiles((f) => f.filter((_, j) => j !== i));
 
   let log = controlled ? messages : local;
   if (controlled && !log.length && greeting) log = [{ who: 'agent', text: greeting }];
-  if (pending && (!controlled || messages.length <= pending.baseLen)) log = [...log, { who: 'user', text: pending.text }];
+  if (pending && (!controlled || messages.length <= pending.baseLen)) {
+    log = [...log, { who: 'user', text: pending.text, attachments: pending.attachments }];
+  }
   const streaming = log[log.length - 1]?.streaming;
 
   useEffect(() => {
@@ -77,18 +122,22 @@ export default function AgentChat({
   const send = async (e) => {
     e?.preventDefault();
     const text = input.trim();
-    if (!text || busy) return;
+    if ((!text && !files.length) || busy) return;
+    const picked = files;
     setInput('');
+    setFiles([]);
     setError(null);
     setBusy(true);
     try {
+      const attachments = await Promise.all(picked.map(encodeFile));
+      const shown = picked.map(previewOf);
       if (controlled) {
-        setPending({ text, baseLen: messages.length });
-        await onSend(text);
+        setPending({ text, attachments: shown, baseLen: messages.length });
+        await onSend({ text, attachments });
       } else {
         const history = local.filter((m) => m.text !== greeting);
-        setLocal((l) => [...l, { who: 'user', text }]);
-        await streamHelper(text, history, {
+        setLocal((l) => [...l, { who: 'user', text, attachments: shown }]);
+        await streamHelper(text, history, attachments, {
           onDelta: (delta) =>
             setLocal((l) => {
               const last = l[l.length - 1];
@@ -102,6 +151,7 @@ export default function AgentChat({
     } catch (err) {
       setError(describeChatError(err));
       setInput(text);
+      setFiles(picked);
       if (!controlled) setLocal((l) => l.filter((m) => !m.streaming && m.text !== text));
     } finally {
       // Local helper requests bypass useSendMessage, but spend the same daily
@@ -118,6 +168,7 @@ export default function AgentChat({
         {log.map((m, i) => (
           <div key={i} className={`msg ${m.who}${m.streaming ? ' streaming' : ''}`}>
             {m.text}
+            {m.attachments?.length > 0 && <MessageAttachments items={m.attachments} />}
           </div>
         ))}
         {busy && !streaming && <div className="msg agent muted">thinking...</div>}
@@ -154,7 +205,7 @@ export default function AgentChat({
           aria-label="Message"
           autoFocus={autoFocus}
         />
-        <button type="submit" className="btn btn-agent" disabled={busy || !input.trim()}>
+        <button type="submit" className="btn btn-agent" disabled={busy || (!input.trim() && !files.length)}>
           Send
         </button>
       </form>

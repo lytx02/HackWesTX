@@ -15,7 +15,7 @@ export default function ChatView() {
   if (q.error) return <ErrorNote error={q.error} retry={q.refetch} />;
 
   const { conversation: chat, class: cls, messages } = q.data;
-  const log = messages.map((m) => ({ who: m.sender, text: m.body, streaming: m.streaming }));
+  const log = messages.map((m) => ({ who: m.sender, text: m.body, streaming: m.streaming, attachments: m.attachments ?? undefined }));
 
   return (
     <div className="chat-page">
@@ -34,7 +34,7 @@ export default function ChatView() {
       <div className="card chat-card">
         <AgentChat
           messages={log}
-          onSend={(text) => send.mutateAsync(text)}
+          onSend={(msg) => send.mutateAsync(msg)}
           greeting={`Hi, I'm ${cls.agentName}. What would you like to work through in ${cls.name}?`}
           placeholder="Type something..."
           autoFocus

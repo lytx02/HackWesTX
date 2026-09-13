@@ -3,6 +3,7 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  jsonb,
   check,
   date,
   foreignKey,
@@ -200,6 +201,8 @@ export const messages = pgTable(
     promptTokens: integer('prompt_tokens'),
     completionTokens: integer('completion_tokens'),
     usageSource: text('usage_source'), // 'reported' (server usage) | 'estimated'
+    // User rows only: [{name, type, size, text?, pages?, truncated?, dataUrl?}] (see attachments.js).
+    attachments: jsonb('attachments'),
     createdAt: createdAt(),
   },
   (t) => ({
