@@ -253,3 +253,10 @@ textarea.input { resize: vertical; font-family: var(--font-ui); }
 
 /* Canvas connect card */
 .steps { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-ui); font-size: .9rem; }
+
+/* Token usage indicator (dashboard heading) ------------------------------ */
+.usage-bar { display: inline-flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-xs); font-family: var(--font-ui); font-size: .75rem; color: var(--color-textMuted); }
+.usage-track { display: block; width: 120px; height: 5px; border-radius: var(--radius-pill); background: var(--color-border); overflow: hidden; }
+.usage-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--color-primary); transition: width var(--motion-base); }
+.usage-bar.warn .usage-fill { background: var(--color-accent); }
+.usage-bar.warn .usage-text { color: var(--color-accent); }

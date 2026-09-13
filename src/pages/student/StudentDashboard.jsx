@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tile from '../../components/Tile.jsx';
 import Announcements from '../../components/Announcements.jsx';
+import TokenUsageBar from '../../components/TokenUsageBar.jsx';
 import CanvasConnect from '../../components/CanvasConnect.jsx';
 import ClassFormModal from '../../components/ClassFormModal.jsx';
 import { AddBox, ClassCard } from '../../components/ClassCard.jsx';
@@ -31,6 +32,7 @@ export default function StudentDashboard({ me }) {
         <div>
           <p className="eyebrow">{institution?.name ?? 'Campus AI'}</p>
           <h1>Dashboard</h1>
+          <TokenUsageBar />
         </div>
         <span className="muted">
           {user.email} · <span className="chip">{user.role}</span>
