@@ -58,6 +58,9 @@ export function SessionProvider({ children, auth0 }) {
       setPendingRole,
       institution: session?.institution ?? null,
       auth0Loading: Boolean(auth0?.isLoading),
+      auth0Authenticated: Boolean(auth0?.isAuthenticated),
+      // Auth0 bounced back with ?error=... (e.g. app not authorized for the API).
+      auth0Error: auth0?.error?.message ?? null,
 
       // Auth0: send the browser to Universal Login. `role` rides along in
       // appState and comes back on /callback for first-time registration.
@@ -67,8 +70,14 @@ export function SessionProvider({ children, auth0 }) {
           authorizationParams: signup ? { screen_hint: 'signup' } : {},
         }),
 
-      // Auth0: after the redirect, create or fetch our user row.
-      completeAuth0: async ({ role }) => adopt(await api.post('/auth/register', role ? { role } : {})),
+      // Auth0: after the redirect, create or fetch our user row. The token
+      // provider is installed here explicitly: the callback page's effect runs
+      // before this provider's own effect, so it cannot rely on that.
+      completeAuth0: async ({ role }) => {
+        if (!auth0?.isAuthenticated) throw new Error('Auth0 sign-in did not complete');
+        setTokenProvider(() => auth0.getAccessTokenSilently());
+        return adopt(await api.post('/auth/register', role ? { role } : {}));
+      },
 
       // Legacy email + role login (demo accounts, local dev).
       signIn: async ({ role, email, name }) => {

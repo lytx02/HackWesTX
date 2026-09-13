@@ -9,7 +9,7 @@ const ROLES = [
 
 export default function Landing() {
   const [role, setRole] = useState(null);
-  const { mode, setPendingRole, signInWithAuth0 } = useSession();
+  const { mode, setPendingRole, signInWithAuth0, auth0Error } = useSession();
   const navigate = useNavigate();
 
   // Auth0: role rides along to /callback for first-time registration.
@@ -42,6 +42,12 @@ export default function Landing() {
             </button>
           ))}
         </div>
+
+        {auth0Error && (
+          <p className="error">
+            Sign-in failed: {auth0Error}
+          </p>
+        )}
 
         <div className="row between">
           <span className="muted">

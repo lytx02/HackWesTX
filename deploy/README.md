@@ -37,8 +37,8 @@ chown -R www-data:www-data /opt/campus-ai
 git config --global --add safe.directory /opt/campus-ai
 
 # 4. Database (only if this database has not been migrated/seeded yet)
-sudo -u www-data npm run db:migrate
-sudo -u www-data npm run db:seed        # WIPES tables; skip if you have real data
+npm run db:migrate
+npm run db:seed        # WIPES tables; skip if you have real data
 
 # 5. API service
 cp /opt/campus-ai/deploy/systemd/campus-ai-api.service /etc/systemd/system/
@@ -76,7 +76,7 @@ curl -s https://chalktexas.tech/api/health
 
 ```bash
 cd /opt/campus-ai && git pull
-cd server && npm ci && sudo -u www-data npm run db:migrate && systemctl restart campus-ai-api
+cd server && npm ci && npm run db:migrate && systemctl restart campus-ai-api
 cd .. && npm ci && npm run build && rsync -a --delete dist/ /var/www/chalktexas.tech/
 ```
 

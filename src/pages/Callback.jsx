@@ -7,7 +7,7 @@ import { useSession } from '../state/SessionContext.jsx';
 export default function Callback() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { mode, session, auth0Loading, completeAuth0, signOut } = useSession();
+  const { mode, session, auth0Loading, auth0Authenticated, completeAuth0, signOut } = useSession();
   const [error, setError] = useState(null);
   const [role, setRole] = useState(location.state?.role ?? null);
   const [needsRole, setNeedsRole] = useState(false);
@@ -22,6 +22,11 @@ export default function Callback() {
       return;
     }
     if (auth0Loading || needsRole) return;
+    // Landed here without a completed Auth0 login (e.g. cancelled): start over.
+    if (!auth0Authenticated) {
+      navigate('/', { replace: true });
+      return;
+    }
 
     let cancelled = false;
     completeAuth0({ role })
@@ -35,7 +40,7 @@ export default function Callback() {
     return () => {
       cancelled = true;
     };
-  }, [mode, session, auth0Loading, role, needsRole]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, session, auth0Loading, auth0Authenticated, role, needsRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="centered">
