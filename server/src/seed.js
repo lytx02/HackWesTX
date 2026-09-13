@@ -14,7 +14,7 @@ import { DEFAULT_BASE_PROMPT } from './agent.js';
 const clamp = (n) => Math.max(40, Math.min(100, Math.round(n)));
 const slug = (s) => s.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
 
-await db.execute(sql`truncate ${t.messages}, ${t.conversations}, ${t.submissions}, ${t.assignments}, ${t.digestItems}, ${t.announcements}, ${t.enrollments}, ${t.sessions}, ${t.agentSettings}, ${t.classes}, ${t.users}, ${t.institutions} restart identity cascade`);
+await db.execute(sql`truncate ${t.conversationDailySummaries}, ${t.messages}, ${t.conversations}, ${t.submissions}, ${t.assignments}, ${t.digestItems}, ${t.digestRuns}, ${t.announcements}, ${t.enrollments}, ${t.sessions}, ${t.agentSettings}, ${t.classes}, ${t.users}, ${t.institutions} restart identity cascade`);
 
 // The one agent's base prompt
 await db.insert(t.agentSettings).values({ id: 1, basePrompt: DEFAULT_BASE_PROMPT });
@@ -90,7 +90,8 @@ mock.assignments.forEach((a, i) => {
 });
 if (subs.length) await db.insert(t.submissions).values(subs);
 
-// Digest + announcements
+// Digest + announcements. Seeded digest items are demo placeholders: no
+// digest_runs row, rank, or topic, so they are never shown as generated insights.
 const digestRows = Object.entries(mock.digests).flatMap(([cid, items]) => items.map((d) => ({ classId: classId[cid], kind: d.kind, body: d.text })));
 if (digestRows.length) await db.insert(t.digestItems).values(digestRows);
 await db.insert(t.announcements).values(

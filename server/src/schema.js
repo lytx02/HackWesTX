@@ -3,7 +3,9 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  check,
   date,
+  foreignKey,
   index,
   integer,
   pgEnum,
@@ -46,11 +48,18 @@ export const users = pgTable(
     canvasName: text('canvas_name'),
     canvasConnectedAt: timestamp('canvas_connected_at', { withTimezone: true }),
     canvasLastSyncAt: timestamp('canvas_last_sync_at', { withTimezone: true }),
+    // Daily AI allowance (DAILY_TOKEN_LIMIT), shared across class chats, the
+    // floating helper, and professor-triggered summaries/digests. ai_usage_day is
+    // the America/Chicago calendar day the counter belongs to; a stored day older
+    // than today means zero current usage until the next atomic rollover write.
+    aiUsageDay: date('ai_usage_day', { mode: 'string' }),
+    aiTokensUsed: integer('ai_tokens_used').notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => ({
     emailIdx: uniqueIndex('users_email_idx').on(sql`lower(${t.email})`),
     auth0Idx: uniqueIndex('users_auth0_sub_idx').on(t.auth0Sub),
+    aiTokensNonNeg: check('users_ai_tokens_used_nonneg', sql`${t.aiTokensUsed} >= 0`),
   })
 );
 
@@ -186,14 +195,102 @@ export const messages = pgTable(
       .references(() => conversations.id, { onDelete: 'cascade' }),
     sender: messageSender('sender').notNull(),
     body: text('body').notNull(),
+    // Model usage for agent rows only. Null on user rows and on history that
+    // predates metering; never backfilled with invented counts.
+    promptTokens: integer('prompt_tokens'),
+    completionTokens: integer('completion_tokens'),
+    usageSource: text('usage_source'), // 'reported' (server usage) | 'estimated'
     createdAt: createdAt(),
   },
   (t) => ({
     convIdx: index('messages_conversation_idx').on(t.conversationId, t.createdAt),
+    promptTokensNonNeg: check('messages_prompt_tokens_nonneg', sql`${t.promptTokens} IS NULL OR ${t.promptTokens} >= 0`),
+    completionTokensNonNeg: check(
+      'messages_completion_tokens_nonneg',
+      sql`${t.completionTokens} IS NULL OR ${t.completionTokens} >= 0`
+    ),
+    usageSourceValid: check(
+      'messages_usage_source_valid',
+      sql`${t.usageSource} IS NULL OR ${t.usageSource} IN ('reported', 'estimated')`
+    ),
+    usageAgentOnly: check(
+      'messages_usage_agent_only',
+      sql`${t.sender} = 'agent' OR (${t.promptTokens} IS NULL AND ${t.completionTokens} IS NULL AND ${t.usageSource} IS NULL)`
+    ),
   })
 );
 
-// AI Digest bullets shown to instructors. The agent will write these later.
+// End-of-day two-line summary of one student conversation for one
+// America/Chicago calendar day. Internal input to instructor digests only: never
+// inserted into the chat or the student's model context. One row per
+// conversation/day; today's row is refreshed in place until the nightly run
+// finalizes it. Class/user are derived through the conversation, not duplicated.
+export const conversationDailySummaries = pgTable(
+  'conversation_daily_summaries',
+  {
+    id: id(),
+    conversationId: uuid('conversation_id').notNull(), // FK named below (default name exceeds 63 chars)
+    summaryDay: date('summary_day', { mode: 'string' }).notNull(), // Central calendar day
+    body: text('body').notNull(), // exactly two nonempty lines, length-capped by the writer
+    messageCount: integer('message_count').notNull(), // source messages in this snapshot
+    // Watermark of the last source message under (created_at, id) ordering. The
+    // ID is deliberately not a FK so deleting a message never drops the summary.
+    sourceThroughAt: timestamp('source_through_at', { withTimezone: true }),
+    sourceThroughMessageId: uuid('source_through_message_id'),
+    snapshotAt: timestamp('snapshot_at', { withTimezone: true }).notNull(), // when the input was selected
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    conversationFk: foreignKey({
+      name: 'conversation_daily_summaries_conversation_fk',
+      columns: [t.conversationId],
+      foreignColumns: [conversations.id],
+    }).onDelete('cascade'),
+    convDayIdx: uniqueIndex('conversation_daily_summaries_conv_day_idx').on(t.conversationId, t.summaryDay),
+    dayIdx: index('conversation_daily_summaries_day_idx').on(t.summaryDay, t.conversationId),
+    messageCountNonNeg: check('conversation_daily_summaries_message_count_nonneg', sql`${t.messageCount} >= 0`),
+  })
+);
+
+// One successful digest generation for a class (a valid zero-item result is
+// still a run). Items hang off the run; GET returns only the newest run.
+export const digestRuns = pgTable(
+  'digest_runs',
+  {
+    id: id(),
+    classId: uuid('class_id')
+      .notNull()
+      .references(() => classes.id, { onDelete: 'cascade' }),
+    generatedBy: uuid('generated_by').references(() => users.id, { onDelete: 'set null' }),
+    // Inclusive seven-day Central window: today plus the previous six days.
+    windowStartDay: date('window_start_day', { mode: 'string' }).notNull(),
+    windowEndDay: date('window_end_day', { mode: 'string' }).notNull(),
+    timeZone: text('time_zone').notNull(),
+    summaryCount: integer('summary_count').notNull().default(0),
+    studentCount: integer('student_count').notNull().default(0),
+    // Total reported/estimated model usage across every call in this run.
+    promptTokens: integer('prompt_tokens'),
+    completionTokens: integer('completion_tokens'),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    classIdx: index('digest_runs_class_idx').on(t.classId, t.createdAt),
+    windowSevenDays: check('digest_runs_window_seven_days', sql`${t.windowEndDay} - ${t.windowStartDay} = 6`),
+    summaryCountNonNeg: check('digest_runs_summary_count_nonneg', sql`${t.summaryCount} >= 0`),
+    studentCountNonNeg: check('digest_runs_student_count_nonneg', sql`${t.studentCount} >= 0`),
+    promptTokensNonNeg: check('digest_runs_prompt_tokens_nonneg', sql`${t.promptTokens} IS NULL OR ${t.promptTokens} >= 0`),
+    completionTokensNonNeg: check(
+      'digest_runs_completion_tokens_nonneg',
+      sql`${t.completionTokens} IS NULL OR ${t.completionTokens} >= 0`
+    ),
+  })
+);
+
+// AI Digest bullets shown to instructors. Generated items belong to a
+// digest_runs row (kind 'suggestion', rank 1..3, topic title, short body).
+// Seeded/legacy items have a null run ID and are not presented as generated
+// insights.
 export const digestItems = pgTable(
   'digest_items',
   {
@@ -201,12 +298,17 @@ export const digestItems = pgTable(
     classId: uuid('class_id')
       .notNull()
       .references(() => classes.id, { onDelete: 'cascade' }),
+    digestRunId: uuid('digest_run_id').references(() => digestRuns.id, { onDelete: 'cascade' }),
+    rank: integer('rank'), // 1..3 within a run
+    topic: text('topic'),
     kind: digestKind('kind').notNull(),
     body: text('body').notNull(),
     createdAt: createdAt(),
   },
   (t) => ({
     classIdx: index('digest_items_class_idx').on(t.classId),
+    runRankIdx: uniqueIndex('digest_items_run_rank_idx').on(t.digestRunId, t.rank),
+    rankRange: check('digest_items_rank_range', sql`${t.rank} IS NULL OR (${t.rank} BETWEEN 1 AND 3)`),
   })
 );
 
