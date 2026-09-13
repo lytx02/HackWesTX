@@ -8,43 +8,58 @@ body {
   color: var(--color-text);
   transition: background var(--motion-base), color var(--motion-base);
 }
-h1, h2, h3, h4 { font-family: var(--font-body); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
 button, input, select { font-family: var(--font-ui); font-size: 1rem; }
 a { color: inherit; }
 
 /* Primitives ------------------------------------------------------------ */
 .btn {
   display: inline-flex; align-items: center; gap: var(--space-sm);
-  padding: 10px 18px; border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
-  cursor: pointer; transition: transform var(--motion-fast), box-shadow var(--motion-fast), background var(--motion-fast);
+  padding: 11px 20px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-borderStrong); background: var(--color-surface); color: var(--color-text);
+  font-family: var(--font-ui); font-size: .78rem; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .1em;
+  cursor: pointer; transition: transform var(--motion-fast), box-shadow var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
 }
-.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+.btn:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-lift); }
+.btn:active { transform: translate(1px, 1px); box-shadow: none; }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-primary { background: var(--color-primary); color: var(--color-primaryText); border-color: var(--color-primary); }
 .btn-ghost { background: transparent; border-color: transparent; }
-.btn-agent { background: var(--color-agent); color: #fff; border-color: var(--color-agent); }
-.btn-sm { padding: 6px 12px; font-size: .85rem; }
+.btn-agent { background: var(--color-agent); color: var(--color-agentText); border-color: var(--color-agent); }
+.btn-sm { padding: 6px 12px; font-size: .68rem; }
 
 .field { display: flex; flex-direction: column; gap: var(--space-xs); }
 .field label { font-family: var(--font-ui); font-size: .85rem; color: var(--color-textMuted); }
 .input {
-  padding: 11px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-border);
+  padding: 11px 14px; border-radius: var(--radius-sm); border: 1px solid var(--color-border);
   background: var(--color-surface); color: var(--color-text); outline: none; width: 100%;
   transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
 }
-.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent); }
+.input:focus { border-color: var(--color-primary); box-shadow: 2px 2px 0 var(--color-primary); }
 
 .card {
-  background: var(--color-surface); border: 1px solid var(--color-border);
+  position: relative;
+  background: var(--color-surface); border: 1px solid var(--color-borderStrong);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); padding: var(--space-lg);
+}
+/* The signature double rule from the plates. Skipped on the two scrolling
+   surfaces, where an inset rule would sit on top of moving content. */
+.card:not(.chat-card):not(.agent-panel)::after {
+  content: ''; position: absolute; inset: 5px; pointer-events: none;
+  border: 1px solid var(--color-border); border-radius: calc(var(--radius-lg) - 3px);
 }
 .muted { color: var(--color-textMuted); font-family: var(--font-ui); font-size: .9rem; }
 .eyebrow { font-family: var(--font-ui); text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; color: var(--color-textMuted); }
 .error { color: var(--color-accent); font-family: var(--font-ui); font-size: .85rem; }
-.chip { font-family: var(--font-ui); font-size: .75rem; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--color-surfaceAlt); color: var(--color-textMuted); white-space: nowrap; }
-.chip-accent { background: var(--color-accentSoft); color: var(--color-accent); }
-.chip-agent { background: var(--color-agentSoft); color: var(--color-agent); }
+.chip {
+  font-family: var(--font-ui); font-size: .68rem; font-weight: 500; padding: 3px 9px;
+  border-radius: var(--radius-sm); border: 1px solid var(--color-border);
+  background: transparent; color: var(--color-textMuted);
+  text-transform: uppercase; letter-spacing: .09em; white-space: nowrap;
+}
+.chip-accent { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accentText); }
+.chip-agent { background: transparent; border-color: var(--color-primary); color: var(--color-primary); }
 
 /* Auth / landing pages ------------------------------------------------- */
 .centered { min-height: 100vh; display: grid; place-items: center; padding: var(--space-lg); }
@@ -75,17 +90,34 @@ a { color: inherit; }
   display: flex; flex-direction: column; align-items: center; padding: var(--space-md) 0; gap: var(--space-sm);
   position: sticky; top: 0; height: 100vh;
 }
-.sidebar .brand { font-family: var(--font-body); font-weight: 700; font-size: 1.2rem; margin-bottom: var(--space-md); color: var(--color-primary); }
+.sidebar .brand {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.35rem;
+  margin-bottom: var(--space-md); color: var(--color-primaryText);
+  width: 38px; height: 38px; display: grid; place-items: center;
+  background: var(--color-primary); border-radius: 28%;
+}
 .nav-btn {
-  width: 48px; height: 48px; border-radius: var(--radius-md); border: none; background: transparent;
+  width: 46px; height: 46px; border-radius: var(--radius-sm); border: none; background: transparent;
+  position: relative;
   display: grid; place-items: center; cursor: pointer; color: var(--color-textMuted); font-size: 1.25rem;
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 .nav-btn:hover, .nav-btn.active { background: var(--color-surfaceAlt); color: var(--color-primary); }
+/* Active rule slides in from the gutter rather than popping. */
+.nav-btn::before {
+  content: ''; position: absolute; left: -12px; top: 50%; width: 3px; height: 0;
+  background: var(--color-primary); transform: translateY(-50%);
+  transition: height var(--motion-base);
+}
+.nav-btn.active::before { height: 24px; }
 .sidebar .spacer { flex: 1; }
 .main { padding: var(--space-xl); max-width: var(--layout-maxWidth); width: 100%; margin: 0 auto; }
-.page-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: var(--space-lg); gap: var(--space-md); flex-wrap: wrap; }
-.page-head h1 { font-size: 2rem; }
+.page-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: var(--space-lg); gap: var(--space-md); flex-wrap: wrap;
+  padding-bottom: var(--space-md); border-bottom: 1px solid var(--color-borderStrong);
+}
+.page-head h1 { font-size: 2.1rem; letter-spacing: -0.02em; }
 
 .tiles { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--space-md); }
 .tile { grid-column: span 12; display: flex; flex-direction: column; gap: var(--space-md); min-height: 180px; }
@@ -119,11 +151,11 @@ a { color: inherit; }
 
 /* Agent ------------------------------------------------------------------ */
 .agent-fab {
-  position: fixed; right: 24px; bottom: 24px; width: 60px; height: 60px; border-radius: 50%;
-  background: var(--color-agent); color: #fff; border: none; box-shadow: var(--shadow-lift); cursor: pointer;
+  position: fixed; right: 24px; bottom: 24px; width: 60px; height: 60px; border-radius: 28%;
+  background: var(--color-agent); color: var(--color-agentText); border: none; box-shadow: var(--shadow-lift); cursor: pointer;
   font-size: 1.5rem; display: grid; place-items: center; z-index: 20; transition: transform var(--motion-fast);
 }
-.agent-fab:hover { transform: scale(1.06); }
+.agent-fab:hover { transform: scale(1.06) rotate(-4deg); }
 .agent-panel {
   position: fixed; right: 24px; bottom: 96px; width: min(380px, calc(100vw - 48px)); height: 480px; z-index: 20;
   display: flex; flex-direction: column; overflow: hidden; padding: 0;
@@ -131,9 +163,13 @@ a { color: inherit; }
 .agent-panel header { padding: var(--space-md); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; background: var(--color-agentSoft); }
 .agent-panel header h3 { font-size: 1rem; font-family: var(--font-ui); }
 .agent-log { flex: 1; overflow-y: auto; padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
-.msg { max-width: 85%; padding: 10px 14px; border-radius: var(--radius-md); font-family: var(--font-ui); font-size: .92rem; line-height: 1.45; white-space: pre-wrap; }
+.msg {
+  max-width: 85%; padding: 11px 15px; border-radius: var(--radius-sm);
+  font-family: var(--font-ui); font-size: .92rem; line-height: 1.5; white-space: pre-wrap;
+  border: 1px solid transparent;
+}
 .msg.user { align-self: flex-end; background: var(--color-primary); color: var(--color-primaryText); }
-.msg.agent { align-self: flex-start; background: var(--color-surfaceAlt); }
+.msg.agent { align-self: flex-start; background: transparent; border-color: var(--color-border); }
 .agent-input { display: flex; gap: var(--space-sm); padding: var(--space-sm); border-top: 1px solid var(--color-border); }
 .agent-input .input { flex: 1; }
 .agent-intro { display: flex; gap: var(--space-md); align-items: center; }
@@ -143,13 +179,14 @@ a { color: inherit; }
 .box-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-md); }
 .box {
   display: flex; flex-direction: column; gap: 4px; padding: var(--space-md); min-height: 120px;
-  border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface);
+  border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface);
   color: inherit; text-align: left; cursor: pointer; font-family: var(--font-ui);
   transition: border-color var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
 }
-.box:hover { border-color: var(--color-primary); transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+.box:hover { border-color: var(--color-primary); transform: translate(-2px, -2px); box-shadow: var(--shadow-lift); }
+.box:active { transform: none; box-shadow: none; }
 .box h3 { font-size: 1.05rem; }
-.class-box { border-top: 4px solid var(--box-accent, var(--color-primary)); }
+.class-box { border-top: 5px solid var(--box-accent, var(--color-primary)); }
 .add-box { align-items: center; justify-content: center; border-style: dashed; background: transparent; }
 .add-box .plus, .row-box .plus { font-size: 1.6rem; line-height: 1; color: var(--color-primary); }
 .row-box { flex-direction: row; align-items: center; gap: var(--space-md); min-height: 0; }
@@ -186,3 +223,108 @@ textarea.input { resize: vertical; font-family: var(--font-ui); }
 .chat-card .agent-log { padding: var(--space-lg); }
 .chat-card .msg { max-width: 70%; font-size: 1rem; }
 .tile-compact { min-height: 0; }
+
+/* Motifs ------------------------------------------------------------------
+   The plate glyphs — crosshatch, hatching, concentric arcs, rules. Every one
+   is built from hard colour stops, so they render as flat linework: there is
+   no soft blend anywhere in the palette. Utility classes, available to drop
+   on any element. */
+.motif-grid,
+.motif-hatch,
+.motif-arcs,
+.motif-rules { background-repeat: repeat; }
+
+.motif-grid {
+  background-image:
+    repeating-linear-gradient(0deg, var(--color-primary) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(90deg, var(--color-primary) 0 1px, transparent 1px 11px);
+}
+.motif-hatch {
+  background-image: repeating-linear-gradient(135deg, var(--color-primary) 0 1px, transparent 1px 7px);
+}
+.motif-arcs {
+  background-image: repeating-radial-gradient(circle at 50% 100%, var(--color-primary) 0 1px, transparent 1px 9px);
+}
+.motif-rules {
+  background-image: repeating-linear-gradient(0deg, var(--color-primary) 0 1px, transparent 1px 6px);
+}
+
+/* Landing and auth get the full plate treatment: an outer frame with an inner
+   rule, and two motif marks in the gutters where there is room to breathe. */
+.centered { position: relative; overflow: hidden; }
+.centered::before {
+  content: ''; position: absolute; inset: 18px; pointer-events: none;
+  border: 1px solid var(--color-borderStrong);
+  box-shadow: inset 0 0 0 5px var(--color-bg), inset 0 0 0 6px var(--color-border);
+}
+.centered::after {
+  content: ''; position: absolute; top: 52px; left: 52px; width: 96px; height: 96px;
+  pointer-events: none; opacity: .5;
+  background-image:
+    repeating-linear-gradient(0deg, var(--color-primary) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(90deg, var(--color-primary) 0 1px, transparent 1px 11px);
+}
+.auth-card { position: relative; z-index: 1; }
+@media (max-width: 720px) {
+  .centered::after { display: none; }
+}
+
+/* Motion ------------------------------------------------------------------
+   Everything rises a little and settles. Nothing bounces; the tone is drafted,
+   not playful. */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes plate { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes rule-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Page transition: each route's blocks enter on their own beat. */
+.main > *:not(.modal-backdrop) { animation: rise var(--motion-base) both; }
+.main > .page-head { animation-delay: 0s; }
+.main > .tiles { animation-delay: .05s; }
+
+/* The horizon rule under a page title draws itself in. */
+.page-head { transform-origin: left center; }
+.page-head::after {
+  content: ''; position: absolute; left: 0; bottom: -1px; width: 100%; height: 1px;
+  background: var(--color-primary); transform-origin: left center;
+  animation: rule-in var(--motion-base) both .12s;
+}
+.page-head { position: relative; }
+
+/* Tiles and boxes stagger in. */
+.tiles > * { animation: plate var(--motion-base) both; }
+.tiles > *:nth-child(1) { animation-delay: .06s; }
+.tiles > *:nth-child(2) { animation-delay: .12s; }
+.tiles > *:nth-child(3) { animation-delay: .18s; }
+.tiles > *:nth-child(4) { animation-delay: .24s; }
+.tiles > *:nth-child(n + 5) { animation-delay: .3s; }
+
+.box-grid > * { animation: rise var(--motion-fast) both; }
+.box-grid > *:nth-child(1) { animation-delay: .10s; }
+.box-grid > *:nth-child(2) { animation-delay: .15s; }
+.box-grid > *:nth-child(3) { animation-delay: .20s; }
+.box-grid > *:nth-child(4) { animation-delay: .25s; }
+.box-grid > *:nth-child(n + 5) { animation-delay: .3s; }
+
+/* Chat turns arrive one at a time. */
+.msg { animation: rise 240ms both; }
+
+/* Modals settle onto the page. */
+.modal-backdrop { animation: fade 180ms ease both; }
+.modal.fade-in { animation: plate var(--motion-base) both; }
+
+/* Rows and list items warm on hover rather than jumping. */
+.list-item { transition: background var(--motion-fast), border-color var(--motion-fast); }
+.choice:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lift); }
+.link-btn { transition: opacity var(--motion-fast); }
+.link-btn:hover { opacity: .65; }
+
+@media (prefers-reduced-motion: reduce) {
+  .main > *:not(.modal-backdrop),
+  .tiles > *,
+  .box-grid > *,
+  .msg,
+  .modal.fade-in,
+  .modal-backdrop,
+  .page-head::after { animation: none; }
+  .btn:hover, .box:hover, .choice:hover, .agent-fab:hover { transform: none; }
+}

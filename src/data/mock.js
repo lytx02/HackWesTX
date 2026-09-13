@@ -10,7 +10,9 @@ export const institutions = [
   { id: 'oxford', name: 'University of Oxford', domains: ['ox.ac.uk'] },
 ];
 
-export const CLASS_COLORS = ['#2f4f4f', '#b5533c', '#b8861b', '#4a5f9e', '#3f7d4e', '#7a4a8e'];
+// Ladder from deep purple to stark black, plus one purple tinted toward cream.
+// Every value is a mix of the three Chalk inks - no fourth hue.
+export const CLASS_COLORS = ['#4710C1', '#7146C7', '#3C1299', '#311470', '#261746', '#1B191E'];
 
 export const classes = [
   {
@@ -19,7 +21,7 @@ export const classes = [
     name: 'Computer Networks',
     instructor: 'Dr. A. Borah',
     term: 'Fall 2026',
-    color: '#2f4f4f',
+    color: '#4710C1',
     overview:
       'Socket programming in C, TCP/IP, application and transport layers, routing, and the CSX server lab environment.',
     agentName: 'Packet',
@@ -31,7 +33,7 @@ export const classes = [
     name: 'Linear Algebra',
     instructor: 'Dr. L. Chen',
     term: 'Fall 2026',
-    color: '#b5533c',
+    color: '#7146C7',
     overview: 'Vector spaces, linear transformations, eigenvalues, and applications.',
     agentName: 'Vector',
     agentBlurb: 'Linear Algebra helper. Ask me to walk through eigenvalues, row reduction, or your problem sets.',
@@ -42,7 +44,7 @@ export const classes = [
     name: 'Technical Writing',
     instructor: 'Prof. M. Ortiz',
     term: 'Fall 2026',
-    color: '#b8861b',
+    color: '#3C1299',
     overview: 'Memos, reports, proposals, and documentation for technical audiences.',
     agentName: 'Draft',
     agentBlurb: 'Technical Writing coach. I help outline, tighten, and format your reports.',
