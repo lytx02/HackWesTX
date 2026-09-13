@@ -181,6 +181,12 @@ textarea.input { resize: vertical; font-family: var(--font-ui); }
 .digest-item.suggestion { border-left-color: var(--color-agent); }
 .digest-item p { margin: 0; font-family: var(--font-ui); font-size: .92rem; line-height: 1.45; }
 .digest-item .chip { margin-top: 2px; }
+.digest-meta { display: flex; flex-direction: column; gap: 2px; }
+.digest-item .grow { flex: 1; min-width: 0; }
+.digest-rank { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--color-agentSoft); color: var(--color-agent); display: grid; place-items: center; font-family: var(--font-ui); font-size: .8rem; font-weight: 700; }
+.digest-topic { font-family: var(--font-ui); font-weight: 600; font-size: .95rem; margin-bottom: 2px; }
+.digest-actions { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; }
+.digest-state { margin: 0; }
 
 /* Chat view -------------------------------------------------------------- */
 .chat-page { display: flex; flex-direction: column; height: calc(100vh - 2 * var(--space-xl)); }

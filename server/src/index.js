@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import { pool } from './db.js';
@@ -8,10 +9,11 @@ import { conversationsRouter } from './routes/conversations.js';
 import { agentRouter } from './routes/agent.js';
 import { canvasRouter } from './routes/canvas.js';
 import { usageRouter } from './routes/usage.js';
+import { digestsRouter } from './routes/digests.js';
 import { HttpError, errorPayload } from './http.js';
 import { ping as pingLlm } from './llm.js';
 
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const origins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',').map((s) => s.trim());
 
@@ -42,6 +44,7 @@ app.use(conversationsRouter);
 app.use(agentRouter);
 app.use(canvasRouter);
 app.use(usageRouter); // GET /ai/usage; also carries the DAILY_TOKEN_LIMIT quota errors
+app.use(digestsRouter); // GET/POST /classes/:classId/digest[/generate]
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -56,4 +59,11 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
-app.listen(port, () => console.log(`campus-ai api listening on http://localhost:${port} (auth: ${process.env.AUTH0_DOMAIN && process.env.AUTH0_AUDIENCE ? 'auth0 + legacy' : 'legacy only'})`));
+export function start() {
+  return app.listen(port, () =>
+    console.log(`campus-ai api listening on http://localhost:${port} (auth: ${process.env.AUTH0_DOMAIN && process.env.AUTH0_AUDIENCE ? 'auth0 + legacy' : 'legacy only'})`)
+  );
+}
+
+// Only listen when executed directly so tests can import `app` without binding a port.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) start();

@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db.js';
-import { assignments, classes, conversations, digestItems, enrollments, submissions, users } from '../schema.js';
+import { assignments, classes, conversations, enrollments, submissions, users } from '../schema.js';
 import { requireRole, requireUser } from '../auth.js';
 import { badRequest, forbidden, isUuid, notFound, requireString, wrap } from '../http.js';
+import { getLatestDigest } from '../digests.js';
 
 export const classesRouter = Router();
 classesRouter.use(requireUser);
@@ -87,7 +88,9 @@ classesRouter.get(
       .orderBy(asc(assignments.dueDate));
     const assignmentList = rows.map((r) => ({ ...r.a, avg: r.avg, done: r.done }));
 
-    const digest = await db.select().from(digestItems).where(eq(digestItems.classId, cls.id)).orderBy(desc(digestItems.createdAt));
+    // Students never see digest/source data. Instructors see only items from the
+    // newest successful run; seeded items (null run IDs) are not generated insights.
+    const digest = req.membership === 'instructor' ? (await getLatestDigest(cls.id)).items : [];
 
     let roster = [];
     if (req.membership === 'instructor') {

@@ -1,0 +1,24 @@
+# /etc/systemd/system/campus-ai-summary.timer
+#
+# Fires campus-ai-summary.service at 00:05 America/Chicago every day. The named
+# zone keeps the schedule DST-aware. Persistent=true runs a job that was missed
+# while the host was off; the service's seven-day catch-up then fills in the
+# skipped dates.
+#
+# The timezone suffix in OnCalendar needs systemd 252+ (Ubuntu 24.04+). On older
+# systemd, drop " America/Chicago" and use the matching UTC time:
+#   CST (winter): OnCalendar=*-*-* 06:05:00
+#   CDT (summer): OnCalendar=*-*-* 05:05:00
+# The allowance reset at Central midnight is independent of whether this timer
+# runs, so a missed run never changes a user's quota day.
+
+[Unit]
+Description=Schedule Campus AI daily conversation summaries
+
+[Timer]
+OnCalendar=*-*-* 00:05:00 America/Chicago
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

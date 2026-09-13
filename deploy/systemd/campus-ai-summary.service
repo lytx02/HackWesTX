@@ -1,0 +1,23 @@
+# /etc/systemd/system/campus-ai-summary.service
+#
+# One-shot end-of-day conversation summary job for the API at /opt/campus-ai.
+# It processes every changed student conversation for the completed Central day
+# and runs a seven-day catch-up so a missed timer recovers on the next run.
+# Automatic nightly summaries are system cost: they are not charged against any
+# user's DAILY_TOKEN_LIMIT. Started by campus-ai-summary.timer.
+#
+# Run manually: systemctl start campus-ai-summary
+# Try it once without systemd: cd /opt/campus-ai/server && npm run summary:catch-up
+
+[Unit]
+Description=Campus AI daily conversation summaries
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/opt/campus-ai/server
+EnvironmentFile=/opt/campus-ai/server/.env
+ExecStart=/usr/bin/node scripts/summarize-day.js --catch-up-days 7
+Environment=NODE_ENV=production

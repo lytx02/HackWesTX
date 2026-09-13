@@ -10,7 +10,10 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file-if-exists=.env src/seed.js",
     "db:studio": "drizzle-kit studio",
-    "llm:ping": "node --env-file-if-exists=.env scripts/ping-vllm.js"
+    "llm:ping": "node --env-file-if-exists=.env scripts/ping-vllm.js",
+    "summary:day": "node --env-file-if-exists=.env scripts/summarize-day.js",
+    "summary:catch-up": "node --env-file-if-exists=.env scripts/summarize-day.js --catch-up-days 7",
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -10,6 +10,8 @@ export const keys = {
   agentSettings: ['agent-settings'],
   class: (id) => ['class', id],
   conversation: (id) => ['conversation', id],
+  digest: (classId) => ['digest', classId],
+  usage: ['ai-usage'],
 };
 
 // User, institution, classes (with studentCount), assignments across classes, announcements.
@@ -20,6 +22,26 @@ export const useClass = (id) => useQuery({ queryKey: keys.class(id), queryFn: ()
 
 export const useConversation = (id) =>
   useQuery({ queryKey: keys.conversation(id), queryFn: () => api.get(`/conversations/${id}`), enabled: Boolean(id) });
+
+// Instructor-only AI digest for a class plus the caller's shared daily allowance.
+export const useDigest = (classId) =>
+  useQuery({ queryKey: keys.digest(classId), queryFn: () => api.get(`/classes/${classId}/digest`), enabled: Boolean(classId) });
+
+export const useUsage = (enabled = true) => useQuery({ queryKey: keys.usage, queryFn: () => api.get('/ai/usage'), enabled });
+
+// Generate refreshes today's summaries and builds a new digest, so the caller's
+// allowance is spent even when generation later fails. Invalidate digest and
+// usage on settle; never touch the class query, which the view still owns.
+export function useGenerateDigest(classId) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post(`/classes/${classId}/digest/generate`, {}),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: keys.digest(classId) });
+      qc.invalidateQueries({ queryKey: keys.usage });
+    },
+  });
+}
 
 // Instructor creates; student joins by course number.
 export function useCreateClass() {

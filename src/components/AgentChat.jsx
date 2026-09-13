@@ -20,6 +20,7 @@ export function describeChatError(err) {
     return `You've used your ${limit} allowance for today.${when}`;
   }
   if (err?.code === 'ai_request_in_progress') return 'Your previous request is still running. Wait for it to finish, then try again.';
+  if (err?.code === 'digest_in_progress') return 'A digest is already being generated for this class. Wait for it to finish, then try again.';
   if (err?.status === 401) return 'Your session has expired. Sign in again to keep chatting.';
   return err?.message ?? 'Something went wrong';
 }

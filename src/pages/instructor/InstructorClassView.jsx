@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tile from '../../components/Tile.jsx';
+import DigestTile from '../../components/DigestTile.jsx';
 import AssignmentFormModal from '../../components/AssignmentFormModal.jsx';
 import AgentPromptTile from '../../components/AgentPromptTile.jsx';
 import { useCreateAssignment } from '../../api/hooks.js';
@@ -14,8 +15,6 @@ const initials = (name) =>
     .slice(0, 2)
     .toUpperCase();
 
-const KIND_LABEL = { alert: 'Struggling', suggestion: 'Suggestion', notice: 'Notice' };
-
 // Instructor Class View: performance, students, AI digest, assignments.
 export default function InstructorClassView({ data }) {
   const navigate = useNavigate();
@@ -27,7 +26,6 @@ export default function InstructorClassView({ data }) {
   const graded = all.filter((a) => a.avg != null);
   const overall = graded.length ? Math.round(graded.reduce((s, a) => s + a.avg, 0) / graded.length) : null;
   const roster = [...data.roster].sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-  const digest = data.digest;
   const byDueDesc = [...all].sort((a, b) => b.dueDate.localeCompare(a.dueDate));
 
   return (
@@ -95,22 +93,7 @@ export default function InstructorClassView({ data }) {
           </ul>
         </Tile>
 
-        <Tile title="AI Digest" span={6} action={<span className="chip chip-agent">✦ agent</span>}>
-          {digest.length === 0 ? (
-            <p className="muted">No insights yet. The agent will post here once there is activity.</p>
-          ) : (
-            <ul className="digest">
-              {digest.map((d) => (
-                <li key={d.id} className={`digest-item ${d.kind}`}>
-                  <span className={`chip ${d.kind === 'alert' ? 'chip-accent' : d.kind === 'suggestion' ? 'chip-agent' : ''}`}>
-                    {KIND_LABEL[d.kind]}
-                  </span>
-                  <p>{d.body}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Tile>
+        <DigestTile classId={cls.id} />
 
         <Tile title="Assignments" span={6}>
           <div className="stack">

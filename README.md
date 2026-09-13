@@ -97,8 +97,25 @@ Demo logins after seeding: `student@okstate.edu` (student) and `instructor@oksta
 | `POST /canvas/connect` `{baseUrl, token}` | signed in | Validates a Canvas personal access token, stores it encrypted, imports courses/assignments/submissions. |
 | `POST /canvas/sync` | signed in | Re-imports from Canvas. |
 | `DELETE /canvas` | signed in | Forgets the token (imported classes stay). |
+| `GET /ai/usage` | signed in | `{limit, used, remaining, resetsAt}` from `DAILY_TOKEN_LIMIT`; resets at next Central midnight. |
+| `GET /classes/:id/digest` | instructor member | Newest successful digest run + its ranked items (`{run: null, items: []}` before the first run). |
+| `POST /classes/:id/digest/generate` | instructor member | Refreshes this class's summaries and generates 0-3 ranked reteaching topics; charges the caller's allowance. |
 
 Send the token as `Authorization: Bearer <token>`.
+
+### Daily summaries and digests
+
+Students' class chats are summarized once per America/Chicago calendar day (two lines:
+topics/questions, then unresolved friction, de-identified). Summaries are internal inputs to
+instructor digests — they are never inserted into a chat or the model's context. A professor
+clicks **Generate digest** to refresh today's changed conversations and combine them with the
+previous six Central days into 0-3 ranked reteaching topics. On-demand summary and digest calls
+are charged to the requesting professor's shared daily allowance; the nightly job is system cost.
+
+Nightly runs use `server/scripts/summarize-day.js`; `npm run summary:day` (in `server/`) processes
+the previous completed Central day and `npm run summary:catch-up` scans the last seven days so a
+missed run recovers. `deploy/systemd/campus-ai-summary.{service,timer}` schedule it at 00:05
+America/Chicago. Schemas live in `server/src/summary-time.js`, `summaries.js`, and `digests.js`.
 
 ### AI model (vLLM on RunPod)
 
@@ -118,9 +135,10 @@ checks connectivity and streams a test completion. The data model is documented 
 | `src/api/client.js`, `src/api/hooks.js` | Fetch wrapper + TanStack Query hooks (`useMe`, `useClass`, `useConversation`, mutations). |
 | `src/api/stream.js` | SSE-over-POST reader; `useSendMessage` streams the agent reply into the conversation cache. |
 | `src/data/mock.js` | Seed data for `server/src/seed.js` and the institution dropdown. Not used for app state. |
-| `server/src/llm.js`, `server/src/agent.js` | vLLM client (stream + ping) and the agent's prompt composition / stub fallback. |
+| `server/src/llm.js`, `server/src/agent.js` | vLLM client (stream + ping + `completeChat`) and the agent's prompt composition / stub fallback. |
+| `server/src/summaries.js`, `server/src/summary-time.js`, `server/src/digests.js` | Daily conversation summaries, Central-timezone helpers, and instructor digest generation. |
 | `src/pages/student/*`, `src/pages/instructor/*` | Role-specific views. |
-| `src/components/*` | Tiles, boxes, modals, chat surface, sidebar shell, helper bubble. |
+| `src/components/*` | Tiles, boxes, modals, chat surface (`AgentChat`), digest tile, sidebar shell, helper bubble. |
 
 ## Canvas
 
@@ -136,4 +154,4 @@ later; the sync code is shared.
 ## Not built yet
 
 - Instructor "Workspace" area from the sketch.
-- Real auth (Auth0).
+- A digest history UI (multiple successful runs are stored; only the newest is shown).

@@ -33,6 +33,7 @@ nano .env
 #   CANVAS_TOKEN_KEY=<node -e "console.log(require('crypto').randomBytes(32).toString('base64'))">
 #   VLLM_BASE_URL=https://<POD_ID>-8000.proxy.runpod.net/v1   (see server/.env.example)
 #   VLLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+#   DAILY_TOKEN_LIMIT=50000
 chown -R www-data:www-data /opt/campus-ai
 # Git refuses to touch a repo owned by another user; trust it once (as root).
 git config --global --add safe.directory /opt/campus-ai
@@ -48,6 +49,16 @@ systemctl enable --now campus-ai-api
 systemctl status campus-ai-api --no-pager
 curl -s http://127.0.0.1:4000/health      # expect {"ok":true,"db":"up"}
 curl -s http://127.0.0.1:4000/llm/health  # expect {"ok":true,...,"model":"Qwen/..."}; or `npm run llm:ping`
+
+# 5b. Daily summary timer (nightly two-line summaries for instructor digests).
+#     Runs at 00:05 America/Chicago and catches up the last seven completed days.
+cp /opt/campus-ai/deploy/systemd/campus-ai-summary.service /etc/systemd/system/
+cp /opt/campus-ai/deploy/systemd/campus-ai-summary.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now campus-ai-summary.timer
+systemctl list-timers campus-ai-summary.timer --no-pager
+# Try one run now (safe to repeat: unchanged days are skipped):
+sudo -u www-data bash -c 'cd /opt/campus-ai/server && node scripts/summarize-day.js --catch-up-days 7'
 
 # 6. Frontend build (build on the server so VITE_API_URL from .env.production is used)
 cd /opt/campus-ai && npm ci && npm run build
@@ -88,6 +99,9 @@ The update recipe runs pending migrations before restarting the API; when there 
 ```bash
 systemctl status campus-ai-api      # is the API running
 journalctl -u campus-ai-api -f      # live API logs
+systemctl status campus-ai-summary.timer   # next scheduled summary run
+journalctl -u campus-ai-summary     # last summary job output (scanned/updated/skipped/failed)
+cd /opt/campus-ai/server && npm run summary:day   # run the previous completed Central day now
 curl -s https://chalktexas.tech/api/llm/health   # can the API reach the RunPod vLLM pod
 cd /opt/campus-ai/server && npm run llm:ping     # same, plus a streamed test completion
 nginx -t                            # config syntax
@@ -99,8 +113,26 @@ tail -f /var/log/nginx/error.log    # Nginx errors
 - The API reaches vLLM over the public RunPod proxy (`https://<POD_ID>-8000.proxy.runpod.net`),
   so a stopped/restarted pod means a new `POD_ID`: update `VLLM_BASE_URL` in `server/.env`
   and `systemctl restart campus-ai-api`.
-- Start vLLM with `--served-model-name` (or leave `VLLM_MODEL` blank) so the name here matches.
+- Set `VLLM_MODEL` to the exact served-model id from the running pod; never guess a Qwen id.
+  `npm run llm:ping` lists the ids vLLM reports and streams a test completion.
 - If the pod is started with `--api-key`, set `VLLM_API_KEY` too.
+
+## Rollback
+
+Migration 0003 is purely additive (new tables/columns/checks, no drops or rewrites),
+so a code rollback does not require a database rollback:
+
+```bash
+cd /opt/campus-ai && git log --oneline -5          # find the last good commit
+git checkout <last-good-commit>                    # or: git revert <bad-commit>
+cd server && npm ci && systemctl restart campus-ai-api
+cd .. && npm ci && npm run build && rsync -a --delete dist/ /var/www/chalktexas.tech/
+# Optional: stop scheduling nightly summaries while rolled back
+systemctl disable --now campus-ai-summary.timer
+```
+
+Leaving the summary tables and usage counter columns in place is safe: older code
+simply ignores them. Do not reverse the migration by hand on the shared database.
 
 ## Tightening later
 
