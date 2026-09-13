@@ -75,7 +75,7 @@ export function estimateChatUsage(modelMessages, output = '') {
   // reproduce the deployment model's tokenizer.
   const estimate = (text) => Math.max(1, Math.ceil(new TextEncoder().encode(text).length / 3));
   return {
-    promptTokens: modelMessages.reduce((sum, item) => sum + estimate(item.content), 0),
+    promptTokens: modelMessages.reduce((sum, item) => sum + estimate(llm.contentText(item.content)), 0),
     completionTokens: estimate(output),
     source: 'estimated',
   };
@@ -87,6 +87,7 @@ export async function* replyStream({
   upcoming = [],
   history = [],
   message,
+  images = [],
   signal,
   beforeModelCall,
   recordUsage,
@@ -96,7 +97,7 @@ export async function* replyStream({
     if (typeof beforeModelCall !== 'function' || typeof recordUsage !== 'function') {
       throw new Error('Configured model calls require usage budget callbacks');
     }
-    const modelMessages = llm.toChatMessages(systemPrompt, history, message);
+    const modelMessages = llm.toChatMessages(systemPrompt, history, message, images);
     await beforeModelCall();
     let output = '';
     let settled = false;

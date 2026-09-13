@@ -20,7 +20,8 @@ const origins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',').
 // Behind Nginx in production; trust X-Forwarded-* from the first proxy hop.
 app.set('trust proxy', 1);
 app.use(cors({ origin: origins }));
-app.use(express.json({ limit: '256kb' }));
+// Chat attachments arrive base64-encoded in JSON (see attachments.js limits).
+app.use(express.json({ limit: '30mb' }));
 
 app.get('/health', async (_req, res) => {
   try {

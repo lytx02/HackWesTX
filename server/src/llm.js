@@ -128,8 +128,15 @@ export async function ping() {
   }
 }
 
+// Content is a string, or (VLLM_VISION=true) an array of OpenAI content parts.
+const VISION = process.env.VLLM_VISION === 'true';
+export const contentText = (content) =>
+  typeof content === 'string' ? content : content.filter((p) => p?.type === 'text').map((p) => p.text).join('');
+const isPart = (p) =>
+  (p?.type === 'text' && typeof p.text === 'string') || (p?.type === 'image_url' && typeof p.image_url?.url === 'string');
+
 function contentLength(messages) {
-  return messages.reduce((total, entry) => total + entry.content.length, 0);
+  return messages.reduce((total, entry) => total + contentText(entry.content).length, 0);
 }
 
 function validateMessages(messages) {
@@ -140,8 +147,10 @@ function validateMessages(messages) {
     throw new LlmError(`Model input has ${messages.length} messages; limit is ${MAX_INPUT_MESSAGES}. Chunk the input before calling the model.`);
   }
   for (const entry of messages) {
-    if (!entry || typeof entry.role !== 'string' || typeof entry.content !== 'string') {
-      throw new LlmError('Each model input message must have string role and content fields');
+    const okContent =
+      typeof entry?.content === 'string' || (Array.isArray(entry?.content) && entry.content.length > 0 && entry.content.every(isPart));
+    if (!entry || typeof entry.role !== 'string' || !okContent) {
+      throw new LlmError('Each model input message must have a string role and string or content-part content');
     }
   }
   const chars = contentLength(messages);
@@ -153,14 +162,20 @@ function validateMessages(messages) {
 // DB rows ({sender: 'user'|'agent', body}) -> bounded OpenAI chat messages.
 // History rows themselves are untouched; only the outgoing prompt uses a
 // contiguous suffix that fits the configured limits.
-export function toChatMessages(systemPrompt, history, message) {
+// `images` (data URLs attached to the new turn) become image_url parts when
+// VLLM_VISION=true; otherwise the text already names them and they are dropped.
+export function toChatMessages(systemPrompt, history, message, images = []) {
   if (typeof systemPrompt !== 'string' || typeof message !== 'string' || !Array.isArray(history)) {
     throw new LlmError('toChatMessages requires a system prompt, history array, and user message');
   }
 
+  const userContent =
+    VISION && images.length
+      ? [{ type: 'text', text: message }, ...images.map((url) => ({ type: 'image_url', image_url: { url } }))]
+      : message;
   const fixed = [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: message },
+    { role: 'user', content: userContent },
   ];
   if (contentLength(fixed) > MAX_INPUT_CHARS) {
     throw new LlmError(`System prompt and user message exceed the ${MAX_INPUT_CHARS}-character model input limit`);
@@ -174,9 +189,9 @@ export function toChatMessages(systemPrompt, history, message) {
   let chars = contentLength(fixed);
   for (let index = candidates.length - 1; index >= 0; index -= 1) {
     const candidate = candidates[index];
-    if (chars + candidate.content.length > MAX_INPUT_CHARS) break;
+    if (chars + contentText(candidate.content).length > MAX_INPUT_CHARS) break;
     turns.unshift(candidate);
-    chars += candidate.content.length;
+    chars += contentText(candidate.content).length;
   }
   return [fixed[0], ...turns, fixed[1]];
 }

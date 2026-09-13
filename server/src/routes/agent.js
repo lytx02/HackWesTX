@@ -4,7 +4,8 @@ import { db } from '../db.js';
 import { agentSettings, assignments, classes, enrollments } from '../schema.js';
 import { requireRole, requireUser } from '../auth.js';
 import { buildHelperPrompt, buildSystemPrompt, getAgentSettings, replyStream } from '../agent.js';
-import { errorPayload, forbidden, requireString, wrap } from '../http.js';
+import { badRequest, errorPayload, forbidden, requireString, wrap } from '../http.js';
+import { imageUrls, messageWithAttachments, parseAttachments } from '../attachments.js';
 import { openSse } from '../sse.js';
 import { withUsageBudget } from '../usage.js';
 import { requireMember } from './classes.js';
@@ -68,7 +69,15 @@ agentRouter.get(
 agentRouter.post(
   '/agent/stream',
   wrap(async (req, res) => {
-    const message = requireString(req.body, 'body', { max: 4000 });
+    const attachments = await parseAttachments(req.body?.attachments);
+    const text = attachments.length
+      ? typeof req.body?.body === 'string'
+        ? req.body.body.trim().slice(0, 4000)
+        : ''
+      : requireString(req.body, 'body', { max: 4000 });
+    if (!text && !attachments.length) throw badRequest('Type a message or attach a file');
+    const message = messageWithAttachments(text, attachments);
+    const images = imageUrls(attachments);
     const history = (Array.isArray(req.body.history) ? req.body.history : [])
       .filter((m) => m && typeof m.text === 'string' && (m.who === 'user' || m.who === 'agent'))
       .slice(-30)
@@ -96,6 +105,7 @@ agentRouter.post(
           upcoming,
           history,
           message,
+          images,
           signal: sse.signal,
           beforeModelCall,
           recordUsage,

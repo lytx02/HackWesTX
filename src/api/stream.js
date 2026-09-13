@@ -75,9 +75,10 @@ async function streamChat(path, body, handlers = {}, signal) {
 }
 
 // Class chat: stores the user's message, streams and stores the agent's reply.
-export const streamMessage = (conversationId, text, handlers, signal) =>
-  streamChat(`/conversations/${conversationId}/messages/stream`, { body: text }, handlers, signal);
+// `attachments`: [{name, type, size, data (base64)}] images or PDFs, optional.
+export const streamMessage = (conversationId, text, attachments, handlers, signal) =>
+  streamChat(`/conversations/${conversationId}/messages/stream`, { body: text, attachments }, handlers, signal);
 
 // Floating helper bubble: nothing is stored; send the running log along.
-export const streamHelper = (text, history, handlers, signal) =>
-  streamChat('/agent/stream', { body: text, history }, handlers, signal);
+export const streamHelper = (text, history, attachments, handlers, signal) =>
+  streamChat('/agent/stream', { body: text, history, attachments }, handlers, signal);

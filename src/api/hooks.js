@@ -95,8 +95,8 @@ export function useSendMessage(conversationId, classId) {
   const withoutPartial = (msgs) => msgs.filter((m) => m.id !== STREAMING_ID);
 
   return useMutation({
-    mutationFn: (body) =>
-      streamMessage(conversationId, body, {
+    mutationFn: ({ text, attachments }) =>
+      streamMessage(conversationId, text, attachments, {
         onUser: ({ title, message }) =>
           patch((old) => ({ ...old, conversation: { ...old.conversation, title }, messages: [...old.messages, message] })),
         onDelta: (text) =>
