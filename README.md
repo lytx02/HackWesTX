@@ -68,13 +68,24 @@ Demo logins after seeding: `student@okstate.edu` (student) and `instructor@oksta
 | `POST /classes/:id/conversations` `{title?}` | member | New AI Helper chat. |
 | `GET /conversations/:id` | owner | Conversation + messages. |
 | `POST /conversations/:id/messages` `{body}` | owner | Stores your message, the agent replies in the same request. |
+| `POST /conversations/:id/messages/stream` `{body}` | owner | Same, but the reply streams back as SSE (`user`, `delta`…, `done` / `error`). The app uses this one. |
+| `POST /agent/stream` `{body, history?}` | signed in | Floating helper bubble; not persisted. SSE `delta`…, `done` / `error`. |
+| `GET /llm/health` | anyone | Pings the vLLM server (`GET /v1/models`): `{ok, model, models, latencyMs}`. |
 | `PATCH /conversations/:id` `{title}` | owner | Rename. |
 | `GET /agent-settings` | signed in | The one agent's global base prompt. |
 | `PATCH /agent-settings` `{basePrompt}` | instructor | Edit the base prompt (affects every course). |
 | `PATCH /classes/:id/agent` `{agentInstructions}` | instructor of that class | Per-course instructions appended to the base prompt. Empty clears. |
 | `GET /classes/:id/agent/prompt` | instructor of that class | Preview of the composed system prompt. |
 
-Send the token as `Authorization: Bearer <token>`. The data model is documented in [docs/erd.md](docs/erd.md). Schema lives in `server/src/schema.js`; edit it, then `npm run db:generate` and `npm run db:migrate`.
+Send the token as `Authorization: Bearer <token>`.
+
+### AI model (vLLM on RunPod)
+
+Replies come from Qwen served by vLLM on a RunPod pod, through its OpenAI-compatible API
+(`server/src/llm.js`). Set `VLLM_BASE_URL` (ending in `/v1`) and `VLLM_MODEL` in `server/.env`;
+see `server/.env.example` for the pod vs. serverless URL shapes. With `VLLM_BASE_URL` empty the
+agent answers with canned stub text so the app runs without a GPU. `npm run llm:ping` (in `server/`)
+checks connectivity and streams a test completion. The data model is documented in [docs/erd.md](docs/erd.md). Schema lives in `server/src/schema.js`; edit it, then `npm run db:generate` and `npm run db:migrate`.
 
 ## Code map
 
@@ -84,12 +95,13 @@ Send the token as `Authorization: Bearer <token>`. The data model is documented 
 | `src/theme/global.css` | Structure-only CSS that references the variables. |
 | `src/state/SessionContext.jsx` | Who is signed in; `signIn`/`signOut` call the API and keep the token. |
 | `src/api/client.js`, `src/api/hooks.js` | Fetch wrapper + TanStack Query hooks (`useMe`, `useClass`, `useConversation`, mutations). |
+| `src/api/stream.js` | SSE-over-POST reader; `useSendMessage` streams the agent reply into the conversation cache. |
 | `src/data/mock.js` | Seed data for `server/src/seed.js` and the institution dropdown. Not used for app state. |
-| `src/agent/agent.js` | Client-side stub used only by the floating helper bubble. Class chats go through the API. |
+| `server/src/llm.js`, `server/src/agent.js` | vLLM client (stream + ping) and the agent's prompt composition / stub fallback. |
 | `src/pages/student/*`, `src/pages/instructor/*` | Role-specific views. |
 | `src/components/*` | Tiles, boxes, modals, chat surface, sidebar shell, helper bubble. |
 
 ## Not built yet
 
 - Instructor "Workspace" area from the sketch.
-- Real auth (Auth0), the real AI agent behind `server/src/agent.js`, and deploying the API next to the database on Vultr.
+- Real auth (Auth0).

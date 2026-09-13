@@ -15,7 +15,7 @@ export default function ChatView() {
   if (q.error) return <ErrorNote error={q.error} retry={q.refetch} />;
 
   const { conversation: chat, class: cls, messages } = q.data;
-  const log = messages.map((m) => ({ who: m.sender, text: m.body }));
+  const log = messages.map((m) => ({ who: m.sender, text: m.body, streaming: m.streaming }));
 
   return (
     <div className="chat-page">

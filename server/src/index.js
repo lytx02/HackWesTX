@@ -7,6 +7,7 @@ import { classesRouter } from './routes/classes.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { agentRouter } from './routes/agent.js';
 import { HttpError } from './http.js';
+import { ping as pingLlm } from './llm.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -15,7 +16,7 @@ const origins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',').
 // Behind Nginx in production; trust X-Forwarded-* from the first proxy hop.
 app.set('trust proxy', 1);
 app.use(cors({ origin: origins }));
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '256kb' }));
 
 app.get('/health', async (_req, res) => {
   try {
@@ -24,6 +25,12 @@ app.get('/health', async (_req, res) => {
   } catch (e) {
     res.status(503).json({ ok: false, db: 'down', error: e.message });
   }
+});
+
+// Round trip to the vLLM server on RunPod: {ok, configured, model, models, latencyMs}.
+app.get('/llm/health', async (_req, res) => {
+  const r = await pingLlm();
+  res.status(r.ok ? 200 : 503).json(r);
 });
 
 app.use(authRouter);

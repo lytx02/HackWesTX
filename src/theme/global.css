@@ -134,6 +134,8 @@ a { color: inherit; }
 .msg { max-width: 85%; padding: 10px 14px; border-radius: var(--radius-md); font-family: var(--font-ui); font-size: .92rem; line-height: 1.45; white-space: pre-wrap; }
 .msg.user { align-self: flex-end; background: var(--color-primary); color: var(--color-primaryText); }
 .msg.agent { align-self: flex-start; background: var(--color-surfaceAlt); }
+.msg.streaming::after { content: '8D'; margin-left: 2px; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
 .agent-input { display: flex; gap: var(--space-sm); padding: var(--space-sm); border-top: 1px solid var(--color-border); }
 .agent-input .input { flex: 1; }
 .agent-intro { display: flex; gap: var(--space-md); align-items: center; }

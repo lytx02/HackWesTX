@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { ask } from '../agent/agent.js';
+import { streamHelper } from '../api/stream.js';
 
-// Reusable chat surface. Messages are { who: 'user' | 'agent', text }.
+// Reusable chat surface. Messages are { who: 'user' | 'agent', text, streaming? }.
 //
-// Controlled mode (persisted chats): pass `messages` and `onSend(text)`; the
-// caller posts to the API and the log updates from the server response.
-// Local mode (helper bubble): omit them and the client-side stub answers.
+// Controlled mode (persisted class chats): pass `messages` and `onSend(text)`;
+// the caller streams the reply into its own store and the log re-renders as
+// it grows (a message with `streaming: true` shows a cursor).
+// Local mode (helper bubble): omit them and the log lives here, streamed from
+// POST /agent/stream.
 export default function AgentChat({
-  scope = 'general',
-  context = {},
   greeting,
   placeholder = 'Ask for help...',
   messages,
@@ -17,7 +17,9 @@ export default function AgentChat({
 }) {
   const controlled = Array.isArray(messages);
   const [local, setLocal] = useState(greeting ? [{ who: 'agent', text: greeting }] : []);
-  const [pending, setPending] = useState(null); // user text awaiting the server
+  // The user's text shown optimistically until the server echoes it back
+  // (controlled mode adds it to `messages` on the `user` event).
+  const [pending, setPending] = useState(null); // { text, baseLen }
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -25,11 +27,12 @@ export default function AgentChat({
 
   let log = controlled ? messages : local;
   if (controlled && !log.length && greeting) log = [{ who: 'agent', text: greeting }];
-  if (pending) log = [...log, { who: 'user', text: pending }];
+  if (pending && (!controlled || messages.length <= pending.baseLen)) log = [...log, { who: 'user', text: pending.text }];
+  const streaming = log[log.length - 1]?.streaming;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [log.length, busy]);
+  }, [log.length, busy, log[log.length - 1]?.text.length]);
 
   const send = async (e) => {
     e?.preventDefault();
@@ -40,16 +43,26 @@ export default function AgentChat({
     setBusy(true);
     try {
       if (controlled) {
-        setPending(text);
+        setPending({ text, baseLen: messages.length });
         await onSend(text);
       } else {
+        const history = local.filter((m) => m.text !== greeting);
         setLocal((l) => [...l, { who: 'user', text }]);
-        const reply = await ask({ scope, context, message: text });
-        setLocal((l) => [...l, { who: 'agent', text: reply }]);
+        await streamHelper(text, history, {
+          onDelta: (delta) =>
+            setLocal((l) => {
+              const last = l[l.length - 1];
+              return last?.streaming
+                ? [...l.slice(0, -1), { ...last, text: last.text + delta }]
+                : [...l, { who: 'agent', text: delta, streaming: true }];
+            }),
+        });
+        setLocal((l) => l.map((m) => (m.streaming ? { who: 'agent', text: m.text } : m)));
       }
     } catch (err) {
       setError(err.message ?? 'Something went wrong');
       setInput(text);
+      if (!controlled) setLocal((l) => l.filter((m) => !m.streaming && m.text !== text));
     } finally {
       setPending(null);
       setBusy(false);
@@ -60,11 +73,11 @@ export default function AgentChat({
     <>
       <div className="agent-log">
         {log.map((m, i) => (
-          <div key={i} className={`msg ${m.who}`}>
+          <div key={i} className={`msg ${m.who}${m.streaming ? ' streaming' : ''}`}>
             {m.text}
           </div>
         ))}
-        {busy && <div className="msg agent muted">thinking...</div>}
+        {busy && !streaming && <div className="msg agent muted">thinking...</div>}
         {error && <div className="error">{error}</div>}
         <div ref={endRef} />
       </div>

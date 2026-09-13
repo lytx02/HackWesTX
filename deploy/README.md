@@ -30,6 +30,8 @@ nano .env
 #   DATABASE_URL=postgresql://campus_app:PASSWORD@HOST:16751/campus_ai?sslmode=require&uselibpqcompat=true
 #   PORT=4000
 #   CORS_ORIGIN=https://chalktexas.tech
+#   VLLM_BASE_URL=https://<POD_ID>-8000.proxy.runpod.net/v1   (see server/.env.example)
+#   VLLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 chown -R www-data:www-data /opt/campus-ai
 # Git refuses to touch a repo owned by another user; trust it once (as root).
 git config --global --add safe.directory /opt/campus-ai
@@ -44,6 +46,7 @@ systemctl daemon-reload
 systemctl enable --now campus-ai-api
 systemctl status campus-ai-api --no-pager
 curl -s http://127.0.0.1:4000/health      # expect {"ok":true,"db":"up"}
+curl -s http://127.0.0.1:4000/llm/health  # expect {"ok":true,...,"model":"Qwen/..."}; or `npm run llm:ping`
 
 # 6. Frontend build (build on the server so VITE_API_URL from .env.production is used)
 cd /opt/campus-ai && npm ci && npm run build
@@ -54,6 +57,8 @@ rsync -a --delete dist/ /var/www/chalktexas.tech/
 #    (/etc/nginx/sites-enabled/chalktexas.tech.conf), do NOT add a second one:
 #    merge the /api/ and location / blocks from deploy/nginx/chalktexas.tech.conf
 #    into its HTTPS server block instead (the live server was set up this way).
+#    The /api/ block needs `proxy_buffering off` and the 300s timeouts or chat
+#    replies arrive all at once instead of streaming.
 #    On a fresh box:
 cp /opt/campus-ai/deploy/nginx/chalktexas.tech.conf /etc/nginx/sites-available/chalktexas.tech
 ln -sf /etc/nginx/sites-available/chalktexas.tech /etc/nginx/sites-enabled/chalktexas.tech
@@ -82,9 +87,19 @@ The update recipe runs pending migrations before restarting the API; when there 
 ```bash
 systemctl status campus-ai-api      # is the API running
 journalctl -u campus-ai-api -f      # live API logs
+curl -s https://chalktexas.tech/api/llm/health   # can the API reach the RunPod vLLM pod
+cd /opt/campus-ai/server && npm run llm:ping     # same, plus a streamed test completion
 nginx -t                            # config syntax
 tail -f /var/log/nginx/error.log    # Nginx errors
 ```
+
+## RunPod notes
+
+- The API reaches vLLM over the public RunPod proxy (`https://<POD_ID>-8000.proxy.runpod.net`),
+  so a stopped/restarted pod means a new `POD_ID`: update `VLLM_BASE_URL` in `server/.env`
+  and `systemctl restart campus-ai-api`.
+- Start vLLM with `--served-model-name` (or leave `VLLM_MODEL` blank) so the name here matches.
+- If the pod is started with `--api-key`, set `VLLM_API_KEY` too.
 
 ## Tightening later
 

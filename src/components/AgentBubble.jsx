@@ -1,17 +1,12 @@
 import { useState } from 'react';
 import { useSession } from '../state/SessionContext.jsx';
-import { useMe } from '../api/hooks.js';
-import { upcomingWeek } from '../data/week.js';
 import AgentChat from './AgentChat.jsx';
 
-// The "one big" helper agent: floating bubble available on every page. It still
-// uses the client-side stub; per-class chats go through the API.
+// The "one big" helper agent: floating bubble available on every page. Streams
+// from POST /agent/stream, which knows the user's upcoming work across classes.
 export default function AgentBubble() {
   const [open, setOpen] = useState(false);
   const { session } = useSession();
-  const me = useMe();
-  const { items, label } = upcomingWeek(me.data?.assignments ?? []);
-  const upcoming = items.map((a) => ({ title: a.title, due: a.dueDate }));
 
   return (
     <>
@@ -24,8 +19,6 @@ export default function AgentBubble() {
             </button>
           </header>
           <AgentChat
-            scope="general"
-            context={{ upcoming, label }}
             greeting={
               session?.user?.role === 'instructor'
                 ? 'Hi. Ask me what is due across your classes, or which class needs attention.'

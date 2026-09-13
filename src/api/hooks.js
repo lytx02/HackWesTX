@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client.js';
+import { streamMessage } from './stream.js';
 
 export const keys = {
   me: ['me'],
@@ -59,19 +60,38 @@ export function useCreateConversation() {
   });
 }
 
-// Posts the user's message; the server stores it and the agent's reply, returning both.
+// Sends the user's message and streams the agent's reply straight into the
+// conversation cache: the user turn appears as soon as the server stores it,
+// then a `streaming` agent message grows token by token until `done` swaps in
+// the stored row. Resolves with the finished agent message.
+const STREAMING_ID = 'streaming';
+
 export function useSendMessage(conversationId, classId) {
   const qc = useQueryClient();
+  const key = keys.conversation(conversationId);
+  const patch = (fn) => qc.setQueryData(key, (old) => (old ? fn(old) : old));
+  const withoutPartial = (msgs) => msgs.filter((m) => m.id !== STREAMING_ID);
+
   return useMutation({
-    mutationFn: (body) => api.post(`/conversations/${conversationId}/messages`, { body }),
-    onSuccess: (data) => {
-      qc.setQueryData(keys.conversation(conversationId), (old) =>
-        old
-          ? { ...old, conversation: { ...old.conversation, title: data.title }, messages: [...old.messages, ...data.messages] }
-          : old
-      );
+    mutationFn: (body) =>
+      streamMessage(conversationId, body, {
+        onUser: ({ title, message }) =>
+          patch((old) => ({ ...old, conversation: { ...old.conversation, title }, messages: [...old.messages, message] })),
+        onDelta: (text) =>
+          patch((old) => {
+            const last = old.messages[old.messages.length - 1];
+            const partial =
+              last?.id === STREAMING_ID
+                ? { ...last, body: last.body + text }
+                : { id: STREAMING_ID, conversationId, sender: 'agent', body: text, streaming: true };
+            return { ...old, messages: [...withoutPartial(old.messages), partial] };
+          }),
+      }),
+    onSuccess: (message) => {
+      patch((old) => ({ ...old, messages: [...withoutPartial(old.messages), message] }));
       if (classId) qc.invalidateQueries({ queryKey: keys.class(classId) });
     },
+    onError: () => patch((old) => ({ ...old, messages: withoutPartial(old.messages) })),
   });
 }
 

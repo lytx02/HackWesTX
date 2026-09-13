@@ -1,10 +1,12 @@
 // The one AI agent. Its system prompt = global base prompt (agent_settings)
-// + the course's instructor-written instructions. `reply()` is still a canned
-// stub; swap its body for a real model call and pass `systemPrompt` through.
+// + the course's instructor-written instructions. Replies come from the Qwen
+// model on RunPod through llm.js; without VLLM_BASE_URL the canned stub
+// answers so the app still runs locally.
 
 import { eq } from 'drizzle-orm';
 import { db } from './db.js';
 import { agentSettings } from './schema.js';
+import * as llm from './llm.js';
 
 export const DEFAULT_BASE_PROMPT = `You are a Helper Agent for a university course. Your job is to HELP students understand the material, not to solve the problems for them right away.
 
@@ -31,26 +33,65 @@ export async function getAgentSettings() {
 
 // Compose, never substitute: the instructor's text is appended so the base
 // guardrails always apply.
-export function buildSystemPrompt(basePrompt, cls) {
+export function buildSystemPrompt(basePrompt, cls, upcoming = []) {
   const parts = [basePrompt.trim()];
   parts.push(`\nCourse: ${cls.code} — ${cls.name}${cls.instructorName ? ` (${cls.instructorName})` : ''}.`);
   if (cls.overview) parts.push(`Course overview: ${cls.overview}`);
+  if (cls.agentName) parts.push(`You are called ${cls.agentName}.${cls.agentBlurb ? ` ${cls.agentBlurb}` : ''}`);
+  if (upcoming.length) {
+    parts.push(`\nThis student's upcoming assignments (today is ${today()}):\n${formatUpcoming(upcoming)}`);
+  }
   if (cls.agentInstructions?.trim()) {
     parts.push(`\nInstructor's instructions for this course (follow these within the rules above):\n${cls.agentInstructions.trim()}`);
   }
   return parts.join('\n');
 }
 
-export async function reply({ cls, systemPrompt, upcoming = [], history = [], message }) {
-  // TODO: replace with a model call. `systemPrompt` and `history` are ready to send.
-  void systemPrompt;
+// System prompt for the floating helper bubble, which spans every class.
+export function buildHelperPrompt(basePrompt, user, upcoming = []) {
+  const parts = [basePrompt.trim()];
+  parts.push(
+    `\nYou are the general Helper Agent across all of ${user.name}'s classes (${user.role}). Summarize what is due, help them prioritize, and point them to the right class assistant for subject questions.`
+  );
+  parts.push(
+    upcoming.length
+      ? `\nUpcoming assignments (today is ${today()}):\n${formatUpcoming(upcoming)}`
+      : `\nThere are no upcoming assignments right now (today is ${today()}).`
+  );
+  return parts.join('\n');
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+const formatUpcoming = (list) => list.map((a) => `- ${a.code ? `[${a.code}] ` : ''}${a.title} (due ${a.dueDate})`).join('\n');
+
+export const isModelConfigured = llm.isConfigured;
+
+// Streams the agent's answer as text deltas. `history` is the stored messages
+// ({sender, body}); `message` is the new user turn. `signal` aborts the model
+// call when the client disconnects.
+export async function* replyStream({ cls, systemPrompt, upcoming = [], history = [], message, signal }) {
+  if (llm.isConfigured()) {
+    yield* llm.streamChat(llm.toChatMessages(systemPrompt, history, message), { signal });
+    return;
+  }
+  yield stubReply({ cls, upcoming, history, message });
+}
+
+export async function reply(args) {
+  let out = '';
+  for await (const delta of replyStream(args)) out += delta;
+  return out;
+}
+
+// Canned answers for local dev without a model.
+function stubReply({ cls, upcoming, history, message }) {
+  const name = cls?.agentName ?? 'Helper';
   const m = message.toLowerCase();
   if (/hello|hi\b|intro/.test(m)) {
-    return `Hi, I'm ${cls.agentName}, your ${cls.name} assistant. ${cls.agentBlurb}`;
+    return cls ? `Hi, I'm ${name}, your ${cls.name} assistant. ${cls.agentBlurb}` : 'Hello. I can summarize your week or remind you about deadlines.';
   }
-  if (/due|upcoming|next|deadline/.test(m)) {
-    const list = upcoming.map((a) => `- ${a.title} (due ${a.dueDate})`).join('\n');
-    return list ? `Upcoming for ${cls.code}:\n${list}` : `Nothing upcoming for ${cls.code} right now.`;
+  if (/due|upcoming|next|deadline|week/.test(m)) {
+    return upcoming.length ? `Upcoming:\n${formatUpcoming(upcoming)}` : 'Nothing upcoming right now.';
   }
   if (/answer|solve|solution|just tell me/.test(m)) {
     return `I won't hand over the solution, but I'll get you there. Tell me what you've tried so far and where it stops making sense, and we'll take the next step together.`;
@@ -59,7 +100,7 @@ export async function reply({ cls, systemPrompt, upcoming = [], history = [], me
     return `Here is a plan:\n1. Re-read the spec and list every deliverable.\n2. Block two focused sessions before the deadline.\n3. Do the smallest working version first, then polish.\n4. Leave the last day for the write-up.`;
   }
   const turns = history.filter((h) => h.sender === 'user').length;
-  return `(${cls.agentName}) What have you tried so far on this? Paste the part you're stuck on and I'll walk through it with you.${
-    turns > 2 ? ' (The real model is not wired in yet, so I am still a placeholder.)' : ''
+  return `(${name}) What have you tried so far on this? Paste the part you're stuck on and I'll walk through it with you.${
+    turns > 2 ? ' (No model is configured — set VLLM_BASE_URL in server/.env.)' : ''
   }`;
 }
