@@ -68,10 +68,12 @@ async function institutionForDomain(domain) {
 // POC convenience: a brand-new user joins every existing class at their
 // institution so the dashboard is not empty. Remove once real enrollment exists.
 async function autoEnroll(user, institution) {
+  // Only hand-made/seeded classes; Canvas-imported ones belong to whoever imported them.
+  const notImported = sql`${classes.canvasCourseId} is null`;
   const seeded = await db
     .select({ id: classes.id })
     .from(classes)
-    .where(institution ? eq(classes.institutionId, institution.id) : sql`true`);
+    .where(institution ? and(eq(classes.institutionId, institution.id), notImported) : notImported);
   if (seeded.length) {
     await db
       .insert(enrollments)

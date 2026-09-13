@@ -4,6 +4,7 @@ import { db } from '../db.js';
 import { announcements, assignments, classes, enrollments, institutions } from '../schema.js';
 import { publicUser, requireUser } from '../auth.js';
 import { wrap } from '../http.js';
+import { canvasStatus } from './canvas.js';
 
 export const meRouter = Router();
 
@@ -54,6 +55,7 @@ meRouter.get(
       classes: myClasses.map((r) => ({ ...r.cls, studentCount: r.studentCount })),
       assignments: work.map((r) => ({ ...r.a, avg: r.avg, done: r.done })),
       announcements: notices,
+      canvas: canvasStatus(u),
     });
   })
 );

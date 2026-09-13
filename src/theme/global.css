@@ -67,6 +67,7 @@ a { color: inherit; }
 .fade-in { animation: fade .35s ease both; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .link-btn { background: none; border: none; padding: 0; color: var(--color-primary); text-decoration: underline; cursor: pointer; font-family: var(--font-ui); }
+.link-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* App shell / dashboard ------------------------------------------------ */
 .shell { display: grid; grid-template-columns: var(--layout-sidebar) 1fr; min-height: 100vh; }
@@ -188,3 +189,6 @@ textarea.input { resize: vertical; font-family: var(--font-ui); }
 .chat-card .agent-log { padding: var(--space-lg); }
 .chat-card .msg { max-width: 70%; font-size: 1rem; }
 .tile-compact { min-height: 0; }
+
+/* Canvas connect card */
+.steps { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; font-family: var(--font-ui); font-size: .9rem; }

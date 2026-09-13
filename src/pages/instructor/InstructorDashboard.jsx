@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Tile from '../../components/Tile.jsx';
 import Announcements from '../../components/Announcements.jsx';
+import CanvasConnect from '../../components/CanvasConnect.jsx';
 import ClassFormModal from '../../components/ClassFormModal.jsx';
 import { AddBox, ClassCard } from '../../components/ClassCard.jsx';
 import { useCreateClass } from '../../api/hooks.js';
@@ -25,6 +26,7 @@ export default function InstructorDashboard({ me }) {
 
       <div className="tiles">
         <Announcements items={announcements} />
+        <CanvasConnect canvas={me.canvas} institutionId={user.institutionId} />
 
         <Tile
           title="Classes"

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tile from '../../components/Tile.jsx';
 import Announcements from '../../components/Announcements.jsx';
+import CanvasConnect from '../../components/CanvasConnect.jsx';
 import ClassFormModal from '../../components/ClassFormModal.jsx';
 import { AddBox, ClassCard } from '../../components/ClassCard.jsx';
 import { useCreateClass, useCreateConversation, useToggleDone } from '../../api/hooks.js';
@@ -38,6 +39,7 @@ export default function StudentDashboard({ me }) {
 
       <div className="tiles">
         <Announcements items={announcements} />
+        <CanvasConnect canvas={me.canvas} institutionId={user.institutionId} />
 
         <Tile
           title="Classes"

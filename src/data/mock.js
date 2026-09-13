@@ -2,12 +2,12 @@
 // seeds itself from this file and persists changes to localStorage.
 
 export const institutions = [
-  { id: 'okstate', name: 'Oklahoma State University', domains: ['okstate.edu'] },
-  { id: 'ou', name: 'University of Oklahoma', domains: ['ou.edu'] },
-  { id: 'utexas', name: 'University of Texas at Austin', domains: ['utexas.edu'] },
-  { id: 'mit', name: 'Massachusetts Institute of Technology', domains: ['mit.edu'] },
-  { id: 'ubc', name: 'University of British Columbia', domains: ['ubc.ca', 'student.ubc.ca'] },
-  { id: 'oxford', name: 'University of Oxford', domains: ['ox.ac.uk'] },
+  { id: 'okstate', name: 'Oklahoma State University', domains: ['okstate.edu'], canvasUrl: 'https://canvas.okstate.edu' },
+  { id: 'ou', name: 'University of Oklahoma', domains: ['ou.edu'], canvasUrl: 'https://canvas.ou.edu' },
+  { id: 'utexas', name: 'University of Texas at Austin', domains: ['utexas.edu'], canvasUrl: 'https://utexas.instructure.com' },
+  { id: 'mit', name: 'Massachusetts Institute of Technology', domains: ['mit.edu'], canvasUrl: 'https://canvas.mit.edu' },
+  { id: 'ubc', name: 'University of British Columbia', domains: ['ubc.ca', 'student.ubc.ca'], canvasUrl: 'https://canvas.ubc.ca' },
+  { id: 'oxford', name: 'University of Oxford', domains: ['ox.ac.uk'], canvasUrl: 'https://canvas.ox.ac.uk' },
 ];
 
 export const CLASS_COLORS = ['#2f4f4f', '#b5533c', '#b8861b', '#4a5f9e', '#3f7d4e', '#7a4a8e'];

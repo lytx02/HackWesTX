@@ -93,6 +93,10 @@ Demo logins after seeding: `student@okstate.edu` (student) and `instructor@oksta
 | `PATCH /agent-settings` `{basePrompt}` | instructor | Edit the base prompt (affects every course). |
 | `PATCH /classes/:id/agent` `{agentInstructions}` | instructor of that class | Per-course instructions appended to the base prompt. Empty clears. |
 | `GET /classes/:id/agent/prompt` | instructor of that class | Preview of the composed system prompt. |
+| `GET /canvas/status` | signed in | Whether Canvas is linked (also included in `/me` as `canvas`). |
+| `POST /canvas/connect` `{baseUrl, token}` | signed in | Validates a Canvas personal access token, stores it encrypted, imports courses/assignments/submissions. |
+| `POST /canvas/sync` | signed in | Re-imports from Canvas. |
+| `DELETE /canvas` | signed in | Forgets the token (imported classes stay). |
 
 Send the token as `Authorization: Bearer <token>`.
 
@@ -117,6 +121,17 @@ checks connectivity and streams a test completion. The data model is documented 
 | `server/src/llm.js`, `server/src/agent.js` | vLLM client (stream + ping) and the agent's prompt composition / stub fallback. |
 | `src/pages/student/*`, `src/pages/instructor/*` | Role-specific views. |
 | `src/components/*` | Tiles, boxes, modals, chat surface, sidebar shell, helper bubble. |
+
+## Canvas
+
+Students and instructors can link their school's Canvas with a personal access token
+(Canvas → Account → Settings → New Access Token). The API verifies it against
+`/api/v1/users/self`, encrypts it with `CANVAS_TOKEN_KEY` (AES-256-GCM), and imports
+active courses as classes (keyed by `canvas_course_id`), the user's enrollment role
+(teacher/TA → instructor), assignments with due dates, and the user's own submissions
+as percent scores. The token never leaves the server. Without `CANVAS_TOKEN_KEY` the
+Connect Canvas card is hidden. The OAuth2 developer-key flow can replace the token form
+later; the sync code is shared.
 
 ## Not built yet
 

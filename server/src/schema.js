@@ -38,7 +38,14 @@ export const users = pgTable(
     role: userRole('role').notNull(),
     institutionId: text('institution_id').references(() => institutions.id),
     auth0Sub: text('auth0_sub'), // filled in once Auth0 is wired up
-    canvasUserId: text('canvas_user_id'), // optional: future Canvas LMS import
+    // Canvas link (personal access token flow). Token is AES-256-GCM encrypted
+    // with CANVAS_TOKEN_KEY and never returned to the browser.
+    canvasUserId: text('canvas_user_id'),
+    canvasBaseUrl: text('canvas_base_url'),
+    canvasTokenEnc: text('canvas_token_enc'),
+    canvasName: text('canvas_name'),
+    canvasConnectedAt: timestamp('canvas_connected_at', { withTimezone: true }),
+    canvasLastSyncAt: timestamp('canvas_last_sync_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => ({
@@ -73,12 +80,13 @@ export const classes = pgTable(
     agentInstructions: text('agent_instructions'),
     instructionsUpdatedBy: uuid('instructions_updated_by').references(() => users.id, { onDelete: 'set null' }),
     instructionsUpdatedAt: timestamp('instructions_updated_at', { withTimezone: true }),
-    canvasCourseId: text('canvas_course_id'), // optional: future Canvas LMS import
+    canvasCourseId: text('canvas_course_id'), // "<canvas host>/<course id>", unique per Canvas course
     institutionId: text('institution_id').references(() => institutions.id),
     createdAt: createdAt(),
   },
   (t) => ({
     codeIdx: index('classes_code_idx').on(sql`lower(${t.code})`),
+    canvasIdx: uniqueIndex('classes_canvas_course_idx').on(t.canvasCourseId),
   })
 );
 
@@ -120,10 +128,12 @@ export const assignments = pgTable(
     title: text('title').notNull(),
     details: text('details').notNull().default(''),
     dueDate: date('due_date', { mode: 'string' }).notNull(),
+    canvasAssignmentId: text('canvas_assignment_id'), // "<canvas host>/<assignment id>"
     createdAt: createdAt(),
   },
   (t) => ({
     classIdx: index('assignments_class_idx').on(t.classId, t.dueDate),
+    canvasIdx: uniqueIndex('assignments_canvas_idx').on(t.canvasAssignmentId),
   })
 );
 

@@ -114,3 +114,30 @@ export function useUpdateClassAgent(classId) {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.class(classId) }),
   });
 }
+
+// Canvas link (personal access token). Status rides on /me as `canvas`.
+// Invalidate on settle, not only on success: a failed sync may still have
+// written some classes, and the card should reflect what the server holds.
+export function useConnectCanvas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ baseUrl, token }) => api.post('/canvas/connect', { baseUrl, token }),
+    onSettled: () => qc.invalidateQueries(),
+  });
+}
+
+export function useSyncCanvas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/canvas/sync'),
+    onSettled: () => qc.invalidateQueries(),
+  });
+}
+
+export function useDisconnectCanvas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.del('/canvas'),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}

@@ -30,6 +30,7 @@ nano .env
 #   DATABASE_URL=postgresql://campus_app:PASSWORD@HOST:16751/campus_ai?sslmode=require&uselibpqcompat=true
 #   PORT=4000
 #   CORS_ORIGIN=https://chalktexas.tech
+#   CANVAS_TOKEN_KEY=<node -e "console.log(require('crypto').randomBytes(32).toString('base64'))">
 #   VLLM_BASE_URL=https://<POD_ID>-8000.proxy.runpod.net/v1   (see server/.env.example)
 #   VLLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 chown -R www-data:www-data /opt/campus-ai

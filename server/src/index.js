@@ -6,6 +6,7 @@ import { meRouter } from './routes/me.js';
 import { classesRouter } from './routes/classes.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { agentRouter } from './routes/agent.js';
+import { canvasRouter } from './routes/canvas.js';
 import { HttpError } from './http.js';
 import { ping as pingLlm } from './llm.js';
 
@@ -38,6 +39,7 @@ app.use(meRouter);
 app.use(classesRouter);
 app.use(conversationsRouter);
 app.use(agentRouter);
+app.use(canvasRouter);
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
