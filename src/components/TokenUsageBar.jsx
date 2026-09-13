@@ -15,7 +15,7 @@ export default function TokenUsageBar({ used = 12500, limit = 50000, label = 'AI
       >
         <span className="usage-fill" style={{ width: `${pct}%` }} />
       </span>
-      <span className="usage-text">{pct}% used</span>
+      <span className="usage-text">{pct}% of 100,000 Tokens Used</span>
     </div>
   );
 }
