@@ -20,9 +20,24 @@ The frontend reads `VITE_API_URL` (default `http://localhost:4000`); copy `.env.
 ## Flow
 
 1. `/` Landing questionnaire: **Student** or **Instructor**. Returning users click **Log in**.
-2. `/auth` Choose institution, verify with a `.edu` (or `.ac.xx` / `.edu.xx` / listed domain) email. Verification is simulated.
-3. `/login` Returning user: email + password (any password works) + role.
-4. `/dashboard` and `/class/:id` render a **student** or **instructor** variant based on the role picked.
+2. Sign-in, one of two modes (see Auth below):
+   - **Auth0** (live site): the role rides along to Auth0's Universal Login; `/callback` registers the user on first login.
+   - **Legacy / demo** (no Auth0 configured): `/auth` picks an institution and a `.edu`-style email, `/login` is email + role. No password.
+3. `/dashboard` and `/class/:id` render a **student** or **instructor** variant based on the role.
+
+## Auth
+
+Auth0 is used when `VITE_AUTH0_DOMAIN` + `VITE_AUTH0_CLIENT_ID` are set at build time (frontend)
+and `AUTH0_DOMAIN` + `AUTH0_AUDIENCE` are set on the API. Without them the app runs the legacy
+email + role login, which is what the seeded demo accounts use. Both token kinds are accepted by
+the API at once, so the demo accounts keep working on the live site via **Log in → Use a demo account**.
+
+Auth0 dashboard objects: a *Single Page Application* (callback / logout / web origins:
+`https://chalktexas.tech, http://localhost:5173`) and an *API* with identifier
+`https://chalktexas.tech/api` and **Allow Offline Access** on. First Auth0 login calls
+`POST /auth/register` with the questionnaire role; the email comes from Auth0's `/userinfo` and must be
+`.edu`-style or a listed institution domain. Set `AUTH0_REQUIRE_VERIFIED_EMAIL=true` on the API to
+require the Auth0 verification email before registering (off for the hackathon).
 
 ### Instructor
 
@@ -58,7 +73,9 @@ Demo logins after seeding: `student@okstate.edu` (student) and `instructor@oksta
 
 | Endpoint | Who | What |
 | --- | --- | --- |
-| `POST /auth/login` `{email, role}` | anyone | Creates the user on first login, returns `{token, user, institution}`. Temporary until Auth0. |
+| `GET /auth/config` | anyone | `{mode: 'auth0' \| 'legacy'}`. |
+| `POST /auth/register` `{role?}` | Auth0 token | First Auth0 login: creates or links the user, returns `{user, institution, created}`. |
+| `POST /auth/login` `{email, role}` | anyone | Legacy/demo login, returns `{token, user, institution}`. |
 | `POST /auth/logout` | signed in | Ends the session. |
 | `GET /me` | signed in | User, institution, their classes, announcements. |
 | `POST /classes` `{name, code, overview?}` | instructor creates, student joins by `code` | Returns the class. |

@@ -12,9 +12,12 @@ export default function Shell() {
   const navigate = useNavigate();
   const me = useMe();
 
-  // An expired or revoked session token: drop it and go back to the landing page.
+  // 401 with a valid Auth0 token but no user row: finish registration.
+  // Any other 401 (expired/revoked): drop the session and go back to the landing page.
   useEffect(() => {
-    if (me.error?.status === 401) signOut().then(() => navigate('/', { replace: true }));
+    if (me.error?.status !== 401) return;
+    if (me.error.code === 'not_registered') navigate('/callback', { replace: true });
+    else signOut().then(() => navigate('/', { replace: true }));
   }, [me.error, signOut, navigate]);
 
   const cycleTheme = () => {

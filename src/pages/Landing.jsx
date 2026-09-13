@@ -9,13 +9,18 @@ const ROLES = [
 
 export default function Landing() {
   const [role, setRole] = useState(null);
-  const { setPendingRole } = useSession();
+  const { mode, setPendingRole, signInWithAuth0 } = useSession();
   const navigate = useNavigate();
 
+  // Auth0: role rides along to /callback for first-time registration.
+  // Legacy: continue to the institution + email step.
   const next = () => {
     setPendingRole(role);
-    navigate('/auth', { state: { role } });
+    if (mode === 'auth0') signInWithAuth0({ role, signup: true });
+    else navigate('/auth', { state: { role } });
   };
+
+  const login = () => (mode === 'auth0' ? signInWithAuth0() : navigate('/login'));
 
   return (
     <div className="centered">
@@ -28,13 +33,7 @@ export default function Landing() {
 
         <div className="choice-grid" role="radiogroup" aria-label="Role">
           {ROLES.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              className="choice"
-              aria-pressed={role === r.id}
-              onClick={() => setRole(r.id)}
-            >
+            <button key={r.id} type="button" className="choice" aria-pressed={role === r.id} onClick={() => setRole(r.id)}>
               <span className="dot" />
               <span>
                 <h3>{r.title}</h3>
@@ -47,14 +46,19 @@ export default function Landing() {
         <div className="row between">
           <span className="muted">
             Returning?{' '}
-            <button type="button" className="link-btn" onClick={() => navigate('/login')}>
+            <button type="button" className="link-btn" onClick={login}>
               Log in
             </button>
           </span>
           <button type="button" className="btn btn-primary" disabled={!role} onClick={next}>
-            Next
+            {mode === 'auth0' ? 'Continue' : 'Next'}
           </button>
         </div>
+        {mode === 'legacy' && (
+          <p className="muted" style={{ fontSize: '.8rem' }}>
+            Demo mode: sign in with a .edu email, no password needed.
+          </p>
+        )}
       </div>
     </div>
   );

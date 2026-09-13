@@ -1,13 +1,14 @@
 // Small helpers shared by routes.
 
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    if (code) this.code = code;
   }
 }
 
-export const badRequest = (msg) => new HttpError(400, msg);
+export const badRequest = (msg, code) => new HttpError(400, msg, code);
 export const unauthorized = (msg = 'Sign in required') => new HttpError(401, msg);
 export const forbidden = (msg = 'Not allowed') => new HttpError(403, msg);
 export const notFound = (msg = 'Not found') => new HttpError(404, msg);

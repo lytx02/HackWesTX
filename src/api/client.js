@@ -20,17 +20,34 @@ export function setToken(token) {
   }
 }
 
+// When signed in through Auth0 the SDK supplies fresh access tokens; otherwise
+// the legacy session token from localStorage is used.
+let tokenProvider = null;
+export function setTokenProvider(fn) {
+  tokenProvider = fn;
+}
+
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
 async function request(method, path, body) {
   const headers = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
-  const token = getToken();
+  let token = null;
+  if (tokenProvider) {
+    try {
+      token = await tokenProvider();
+    } catch {
+      token = null; // SDK could not refresh; the request will come back 401
+    }
+  } else {
+    token = getToken();
+  }
   if (token) headers.authorization = `Bearer ${token}`;
 
   let res;
@@ -41,7 +58,7 @@ async function request(method, path, body) {
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? res.statusText);
+  if (!res.ok) throw new ApiError(res.status, data.error ?? res.statusText, data.code);
   return data;
 }
 

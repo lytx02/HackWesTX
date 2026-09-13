@@ -43,10 +43,11 @@ app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+  if (err instanceof HttpError) return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON' });
+  if (Number.isInteger(err.status) && err.status >= 400 && err.status < 500) return res.status(err.status).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: 'Server error' });
 });
 
-app.listen(port, () => console.log(`campus-ai api listening on http://localhost:${port}`));
+app.listen(port, () => console.log(`campus-ai api listening on http://localhost:${port} (auth: ${process.env.AUTH0_DOMAIN && process.env.AUTH0_AUDIENCE ? 'auth0 + legacy' : 'legacy only'})`));
