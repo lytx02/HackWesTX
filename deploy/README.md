@@ -22,7 +22,7 @@ apt install -y nodejs
 
 # 2. Code
 git clone https://github.com/lytx02/HackWesTX.git /opt/campus-ai
-cd /opt/campus-ai/server && npm ci --omit=dev
+cd /opt/campus-ai/server && npm ci   # not --omit=dev: drizzle-kit (migrations) is a dev dependency
 
 # 3. API config (paste your DATABASE_URL; keep CORS_ORIGIN as the site)
 cp .env.example .env
@@ -71,11 +71,11 @@ curl -s https://chalktexas.tech/api/health
 
 ```bash
 cd /opt/campus-ai && git pull
-cd server && npm ci --omit=dev && systemctl restart campus-ai-api
+cd server && npm ci && sudo -u www-data npm run db:migrate && systemctl restart campus-ai-api
 cd .. && npm ci && npm run build && rsync -a --delete dist/ /var/www/chalktexas.tech/
 ```
 
-New migrations: `cd /opt/campus-ai/server && sudo -u www-data npm run db:migrate` before restarting the API.
+The update recipe runs pending migrations before restarting the API; when there are none it is a no-op.
 
 ## Checking things
 
