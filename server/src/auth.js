@@ -47,6 +47,15 @@ export function isAcademicDomain(domain) {
   return /(\.|^)edu$|\.edu\.[a-z]{2}$|\.ac\.[a-z]{2}$/.test(domain);
 }
 
+// REQUIRE_ACADEMIC_EMAIL=false lets any address register (hackathon demo:
+// judges rarely have .edu accounts). Default is the strict rule from the spec.
+const requireAcademic = process.env.REQUIRE_ACADEMIC_EMAIL !== 'false';
+function checkEmailDomain(domain, institution) {
+  if (!institution && requireAcademic && !isAcademicDomain(domain)) {
+    throw badRequest('Use your institution (.edu or equivalent) email');
+  }
+}
+
 async function institutionForDomain(domain) {
   const [row] = await db
     .select()
@@ -138,7 +147,7 @@ authRouter.post(
     }
     const domain = email.split('@')[1];
     const institution = await institutionForDomain(domain);
-    if (!institution && !isAcademicDomain(domain)) throw badRequest('Use your institution (.edu or equivalent) email');
+    checkEmailDomain(domain, institution);
 
     // A legacy account with this email (e.g. seeded demo user): link it to Auth0.
     [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email}`);
@@ -170,7 +179,7 @@ authRouter.post(
     if (!domain) throw badRequest('Enter a valid email');
 
     const institution = await institutionForDomain(domain);
-    if (!institution && !isAcademicDomain(domain)) throw badRequest('Use your institution (.edu or equivalent) email');
+    checkEmailDomain(domain, institution);
 
     let [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email}`);
     if (!user) {
