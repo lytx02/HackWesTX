@@ -2,13 +2,13 @@
 // Events; EventSource cannot POST or send the auth header, so this reads the
 // fetch body by hand and dispatches `event:` / `data:` pairs to `onEvent`.
 
-import { ApiError, getToken } from './client.js';
+import { ApiError, errorFromPayload, resolveToken } from './client.js';
 
 const BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
 
 async function streamRequest(path, body, { onEvent, signal } = {}) {
   const headers = { 'content-type': 'application/json', accept: 'text/event-stream' };
-  const token = getToken();
+  const token = await resolveToken();
   if (token) headers.authorization = `Bearer ${token}`;
 
   let res;
@@ -20,7 +20,7 @@ async function streamRequest(path, body, { onEvent, signal } = {}) {
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, data.error ?? res.statusText);
+    throw errorFromPayload(res.status, data, res.statusText);
   }
   if (!res.body) throw new ApiError(0, 'Streaming is not supported by this browser');
 
@@ -66,7 +66,7 @@ async function streamChat(path, body, handlers = {}, signal) {
       if (event === 'user') handlers.onUser?.(payload);
       else if (event === 'delta') handlers.onDelta?.(payload.text);
       else if (event === 'done') finished = payload.message;
-      else if (event === 'error') failed = new ApiError(502, payload.error ?? 'The assistant is unavailable right now');
+      else if (event === 'error') failed = errorFromPayload(502, payload, 'The assistant is unavailable right now');
     },
   });
   if (failed) throw failed;

@@ -27,27 +27,41 @@ export function setTokenProvider(fn) {
   tokenProvider = fn;
 }
 
+// The one token resolver for every transport (JSON requests and SSE streams),
+// so both always act as the same signed-in user.
+export async function resolveToken() {
+  if (tokenProvider) {
+    try {
+      return await tokenProvider();
+    } catch {
+      return null; // SDK could not refresh; the request will come back 401
+    }
+  }
+  return getToken();
+}
+
+// `limit` and `resetsAt` arrive with 429 ai_quota_exceeded so the UI can show
+// the configured allowance and when it resets; `status` mirrors the HTTP code.
 export class ApiError extends Error {
-  constructor(status, message, code) {
+  constructor(status, message, code, extra = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    if (extra.limit !== undefined) this.limit = extra.limit;
+    if (extra.resetsAt !== undefined) this.resetsAt = extra.resetsAt;
   }
 }
+
+export const errorFromPayload = (status, data, fallback) =>
+  new ApiError(Number.isInteger(data?.status) ? data.status : status, data?.error ?? fallback, data?.code, {
+    limit: data?.limit,
+    resetsAt: data?.resetsAt,
+  });
 
 async function request(method, path, body) {
   const headers = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
-  let token = null;
-  if (tokenProvider) {
-    try {
-      token = await tokenProvider();
-    } catch {
-      token = null; // SDK could not refresh; the request will come back 401
-    }
-  } else {
-    token = getToken();
-  }
+  const token = await resolveToken();
   if (token) headers.authorization = `Bearer ${token}`;
 
   let res;
@@ -58,7 +72,7 @@ async function request(method, path, body) {
   }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? res.statusText, data.code);
+  if (!res.ok) throw errorFromPayload(res.status, data, res.statusText);
   return data;
 }
 

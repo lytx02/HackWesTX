@@ -278,8 +278,10 @@ Still for G when C reports done:
 - Start the API once with a deliberately low `DAILY_TOKEN_LIMIT` (for example `2000`) and confirm: `/health`, `/llm/health`, `npm run llm:ping`, legacy login, a class chat that reopens with history after reload, a 429 with `limit`/`resetsAt` after the allowance is spent, and `GET /ai/usage`.
 - Do not stage C's paths while C is still editing; stage A and G paths explicitly.
 
-Known rough edges at this checkpoint (owned by F, not blockers):
+Landed early from F's scope (2026-09-13) so the checkpoint works with Auth0:
 
-- The frontend does not yet format the 429; inspect the JSON in devtools.
-- Auth0 sessions may fail to stream because `src/api/stream.js` still reads only the legacy localStorage token; use the legacy demo login for this checkpoint or land F's shared token resolver first.
-- The digest router (`server/src/routes/digests.js`) is not mounted yet; add `app.use(digestsRouter)` when E delivers it.
+- `src/api/client.js` exports `resolveToken()` (Auth0 provider when set, else the legacy localStorage token) and `errorFromPayload()`; `ApiError` now carries `code`, `status`, `limit`, `resetsAt`.
+- `src/api/stream.js` awaits `resolveToken()` for SSE requests and maps both pre-stream JSON errors and the SSE `error` event through `errorFromPayload()`. This fixed "Conversation not found" on send when signed in via Auth0 with a stale legacy token in localStorage.
+- `src/components/AgentChat.jsx` exports `describeChatError()`: quota errors show the API-provided limit and reset time in the viewer's locale, 409 and 401 get specific copy, and the unsent draft is kept.
+
+Remaining for F: DigestTile, usage query keys, and the instructor digest view. Remaining for G: mount `digestsRouter` when E delivers it.

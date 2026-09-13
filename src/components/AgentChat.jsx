@@ -8,6 +8,22 @@ import { streamHelper } from '../api/stream.js';
 // it grows (a message with `streaming: true` shows a cursor).
 // Local mode (helper bubble): omit them and the log lives here, streamed from
 // POST /agent/stream.
+
+// Quota and auth errors get specific copy; the limit and reset time come from
+// the API (DAILY_TOKEN_LIMIT, next midnight America/Chicago) and are shown in
+// the viewer's locale. Everything else shows the server's message.
+export function describeChatError(err) {
+  if (err?.code === 'ai_quota_exceeded') {
+    const limit = Number.isFinite(err.limit) ? `${err.limit.toLocaleString()}-token` : 'daily';
+    const at = err.resetsAt ? new Date(err.resetsAt) : null;
+    const when = at && !Number.isNaN(at.getTime()) ? ` It resets ${at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.` : '';
+    return `You've used your ${limit} allowance for today.${when}`;
+  }
+  if (err?.code === 'ai_request_in_progress') return 'Your previous request is still running. Wait for it to finish, then try again.';
+  if (err?.status === 401) return 'Your session has expired. Sign in again to keep chatting.';
+  return err?.message ?? 'Something went wrong';
+}
+
 export default function AgentChat({
   greeting,
   placeholder = 'Ask for help...',
@@ -60,7 +76,7 @@ export default function AgentChat({
         setLocal((l) => l.map((m) => (m.streaming ? { who: 'agent', text: m.text } : m)));
       }
     } catch (err) {
-      setError(err.message ?? 'Something went wrong');
+      setError(describeChatError(err));
       setInput(text);
       if (!controlled) setLocal((l) => l.filter((m) => !m.streaming && m.text !== text));
     } finally {
