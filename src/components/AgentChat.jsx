@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { keys } from '../api/hooks.js';
 import { streamHelper } from '../api/stream.js';
 
 // Reusable chat surface. Messages are { who: 'user' | 'agent', text, streaming? }.
@@ -33,6 +35,7 @@ export default function AgentChat({
   autoFocus = false,
 }) {
   const controlled = Array.isArray(messages);
+  const queryClient = useQueryClient();
   const [local, setLocal] = useState(greeting ? [{ who: 'agent', text: greeting }] : []);
   // The user's text shown optimistically until the server echoes it back
   // (controlled mode adds it to `messages` on the `user` event).
@@ -101,6 +104,9 @@ export default function AgentChat({
       setInput(text);
       if (!controlled) setLocal((l) => l.filter((m) => !m.streaming && m.text !== text));
     } finally {
+      // Local helper requests bypass useSendMessage, but spend the same daily
+      // PostgreSQL-backed allowance even when the model call later errors.
+      if (!controlled) queryClient.invalidateQueries({ queryKey: keys.usage });
       setPending(null);
       setBusy(false);
     }

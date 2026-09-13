@@ -27,7 +27,12 @@ export const useConversation = (id) =>
 export const useDigest = (classId) =>
   useQuery({ queryKey: keys.digest(classId), queryFn: () => api.get(`/classes/${classId}/digest`), enabled: Boolean(classId) });
 
-export const useUsage = (enabled = true) => useQuery({ queryKey: keys.usage, queryFn: () => api.get('/ai/usage'), enabled });
+export const useUsage = (enabled = true) => useQuery({
+  queryKey: keys.usage,
+  queryFn: () => api.get('/ai/usage'),
+  enabled,
+  refetchOnWindowFocus: true,
+});
 
 // Generate refreshes today's summaries and builds a new digest, so the caller's
 // allowance is spent even when generation later fails. Invalidate digest and
@@ -114,6 +119,7 @@ export function useSendMessage(conversationId, classId) {
       if (classId) qc.invalidateQueries({ queryKey: keys.class(classId) });
     },
     onError: () => patch((old) => ({ ...old, messages: withoutPartial(old.messages) })),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.usage }),
   });
 }
 
