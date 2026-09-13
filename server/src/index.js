@@ -7,7 +7,8 @@ import { classesRouter } from './routes/classes.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { agentRouter } from './routes/agent.js';
 import { canvasRouter } from './routes/canvas.js';
-import { HttpError } from './http.js';
+import { usageRouter } from './routes/usage.js';
+import { HttpError, errorPayload } from './http.js';
 import { ping as pingLlm } from './llm.js';
 
 const app = express();
@@ -40,12 +41,15 @@ app.use(classesRouter);
 app.use(conversationsRouter);
 app.use(agentRouter);
 app.use(canvasRouter);
+app.use(usageRouter); // GET /ai/usage; also carries the DAILY_TOKEN_LIMIT quota errors
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  if (err instanceof HttpError) return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+  // errorPayload keeps code/status/limit/resetsAt so a 429 ai_quota_exceeded tells
+  // the client the configured allowance and the next Central midnight.
+  if (err instanceof HttpError) return res.status(err.status).json(errorPayload(err));
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON' });
   if (Number.isInteger(err.status) && err.status >= 400 && err.status < 500) return res.status(err.status).json({ error: err.message });
   console.error(err);
