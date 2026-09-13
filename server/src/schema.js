@@ -38,6 +38,7 @@ export const users = pgTable(
     role: userRole('role').notNull(),
     institutionId: text('institution_id').references(() => institutions.id),
     auth0Sub: text('auth0_sub'), // filled in once Auth0 is wired up
+    canvasUserId: text('canvas_user_id'), // optional: future Canvas LMS import
     createdAt: createdAt(),
   },
   (t) => ({
@@ -67,6 +68,12 @@ export const classes = pgTable(
     instructorName: text('instructor_name').notNull().default('TBD'), // display only
     agentName: text('agent_name').notNull().default('Helper'),
     agentBlurb: text('agent_blurb').notNull().default(''),
+    // Instructor-editable addendum to the global base prompt (agent_settings).
+    // Composed, never substituted, so the base guardrails always apply.
+    agentInstructions: text('agent_instructions'),
+    instructionsUpdatedBy: uuid('instructions_updated_by').references(() => users.id, { onDelete: 'set null' }),
+    instructionsUpdatedAt: timestamp('instructions_updated_at', { withTimezone: true }),
+    canvasCourseId: text('canvas_course_id'), // optional: future Canvas LMS import
     institutionId: text('institution_id').references(() => institutions.id),
     createdAt: createdAt(),
   },
@@ -74,6 +81,15 @@ export const classes = pgTable(
     codeIdx: index('classes_code_idx').on(sql`lower(${t.code})`),
   })
 );
+
+// The one AI agent's base prompt. Single row (id = 1). Per-course instructions
+// on classes.agent_instructions are appended to this at chat time.
+export const agentSettings = pgTable('agent_settings', {
+  id: integer('id').primaryKey(),
+  basePrompt: text('base_prompt').notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 // Membership for both roles: students are enrolled, instructors teach.
 export const enrollments = pgTable(

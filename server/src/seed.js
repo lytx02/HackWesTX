@@ -9,11 +9,15 @@ import { sql } from 'drizzle-orm';
 import { db, pool } from './db.js';
 import * as t from './schema.js';
 import * as mock from '../../src/data/mock.js';
+import { DEFAULT_BASE_PROMPT } from './agent.js';
 
 const clamp = (n) => Math.max(40, Math.min(100, Math.round(n)));
 const slug = (s) => s.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '');
 
-await db.execute(sql`truncate ${t.messages}, ${t.conversations}, ${t.submissions}, ${t.assignments}, ${t.digestItems}, ${t.announcements}, ${t.enrollments}, ${t.sessions}, ${t.classes}, ${t.users}, ${t.institutions} restart identity cascade`);
+await db.execute(sql`truncate ${t.messages}, ${t.conversations}, ${t.submissions}, ${t.assignments}, ${t.digestItems}, ${t.announcements}, ${t.enrollments}, ${t.sessions}, ${t.agentSettings}, ${t.classes}, ${t.users}, ${t.institutions} restart identity cascade`);
+
+// The one agent's base prompt
+await db.insert(t.agentSettings).values({ id: 1, basePrompt: DEFAULT_BASE_PROMPT });
 
 // Institutions
 await db.insert(t.institutions).values(mock.institutions.map((i) => ({ id: i.id, name: i.name, domains: i.domains })));
@@ -45,6 +49,7 @@ const classRows = await db
       instructorName: c.instructor,
       agentName: c.agentName,
       agentBlurb: c.agentBlurb,
+      agentInstructions: c.id === 'cs4283' ? 'Never provide complete C programs. Point students to the relevant man page (socket, bind, connect, read) and ask them to show their compiler output before debugging.' : null,
       institutionId: inst,
     }))
   )

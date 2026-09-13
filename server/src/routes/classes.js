@@ -115,8 +115,12 @@ classesRouter.get(
       .where(and(eq(conversations.classId, cls.id), eq(conversations.userId, user.id)))
       .orderBy(desc(conversations.createdAt));
 
+    // Students do not need the instructor's agent instructions or audit columns.
+    const { agentInstructions, instructionsUpdatedBy, instructionsUpdatedAt, ...publicCls } = cls;
+    const classOut = req.membership === 'instructor' ? cls : publicCls;
+
     res.json({
-      class: cls,
+      class: classOut,
       membership: req.membership,
       assignments: assignmentList,
       roster,

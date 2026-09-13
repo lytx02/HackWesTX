@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tile from '../../components/Tile.jsx';
 import AssignmentFormModal from '../../components/AssignmentFormModal.jsx';
+import AgentPromptTile from '../../components/AgentPromptTile.jsx';
 import { useCreateAssignment } from '../../api/hooks.js';
 import { fmtDate } from '../../data/week.js';
 
@@ -133,6 +134,8 @@ export default function InstructorClassView({ data }) {
             ))}
           </div>
         </Tile>
+
+        <AgentPromptTile cls={cls} />
       </div>
 
       {showCreate && <AssignmentFormModal onClose={() => setShowCreate(false)} onSubmit={(body) => createAssignment.mutateAsync(body)} />}

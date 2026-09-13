@@ -6,6 +6,7 @@ import { api } from './client.js';
 
 export const keys = {
   me: ['me'],
+  agentSettings: ['agent-settings'],
   class: (id) => ['class', id],
   conversation: (id) => ['conversation', id],
 };
@@ -71,5 +72,25 @@ export function useSendMessage(conversationId, classId) {
       );
       if (classId) qc.invalidateQueries({ queryKey: keys.class(classId) });
     },
+  });
+}
+
+// The one agent's global base prompt (agent_settings row).
+export const useAgentSettings = () => useQuery({ queryKey: keys.agentSettings, queryFn: () => api.get('/agent-settings') });
+
+export function useUpdateAgentSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (basePrompt) => api.patch('/agent-settings', { basePrompt }),
+    onSuccess: (data) => qc.setQueryData(keys.agentSettings, data),
+  });
+}
+
+// Per-course instructions appended to the base prompt. Instructor of the course only.
+export function useUpdateClassAgent(classId) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (agentInstructions) => api.patch(`/classes/${classId}/agent`, { agentInstructions }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.class(classId) }),
   });
 }

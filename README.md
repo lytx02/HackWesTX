@@ -69,8 +69,12 @@ Demo logins after seeding: `student@okstate.edu` (student) and `instructor@oksta
 | `GET /conversations/:id` | owner | Conversation + messages. |
 | `POST /conversations/:id/messages` `{body}` | owner | Stores your message, the agent replies in the same request. |
 | `PATCH /conversations/:id` `{title}` | owner | Rename. |
+| `GET /agent-settings` | signed in | The one agent's global base prompt. |
+| `PATCH /agent-settings` `{basePrompt}` | instructor | Edit the base prompt (affects every course). |
+| `PATCH /classes/:id/agent` `{agentInstructions}` | instructor of that class | Per-course instructions appended to the base prompt. Empty clears. |
+| `GET /classes/:id/agent/prompt` | instructor of that class | Preview of the composed system prompt. |
 
-Send the token as `Authorization: Bearer <token>`. Schema lives in `server/src/schema.js`; edit it, then `npm run db:generate` and `npm run db:migrate`.
+Send the token as `Authorization: Bearer <token>`. The data model is documented in [docs/erd.md](docs/erd.md). Schema lives in `server/src/schema.js`; edit it, then `npm run db:generate` and `npm run db:migrate`.
 
 ## Code map
 

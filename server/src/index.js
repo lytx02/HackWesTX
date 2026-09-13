@@ -5,6 +5,7 @@ import { authRouter } from './auth.js';
 import { meRouter } from './routes/me.js';
 import { classesRouter } from './routes/classes.js';
 import { conversationsRouter } from './routes/conversations.js';
+import { agentRouter } from './routes/agent.js';
 import { HttpError } from './http.js';
 
 const app = express();
@@ -29,6 +30,7 @@ app.use(authRouter);
 app.use(meRouter);
 app.use(classesRouter);
 app.use(conversationsRouter);
+app.use(agentRouter);
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 

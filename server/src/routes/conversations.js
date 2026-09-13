@@ -3,7 +3,7 @@ import { and, asc, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { assignments, classes, conversations, messages } from '../schema.js';
 import { requireUser } from '../auth.js';
-import { reply } from '../agent.js';
+import { buildSystemPrompt, getAgentSettings, reply } from '../agent.js';
 import { isUuid, notFound, requireString, wrap } from '../http.js';
 import { requireMember } from './classes.js';
 
@@ -83,7 +83,9 @@ conversationsRouter.post(
       )
       .orderBy(asc(assignments.dueDate));
 
-    const text = await reply({ cls, upcoming, history, message: body });
+    const settings = await getAgentSettings();
+    const systemPrompt = buildSystemPrompt(settings.basePrompt, cls);
+    const text = await reply({ cls, systemPrompt, upcoming, history, message: body });
     const [agentMsg] = await db.insert(messages).values({ conversationId: c.id, sender: 'agent', body: text }).returning();
 
     res.status(201).json({ title, messages: [userMsg, agentMsg] });
