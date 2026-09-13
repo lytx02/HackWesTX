@@ -31,6 +31,8 @@ nano .env
 #   PORT=4000
 #   CORS_ORIGIN=https://chalktexas.tech
 chown -R www-data:www-data /opt/campus-ai
+# Git refuses to touch a repo owned by another user; trust it once (as root).
+git config --global --add safe.directory /opt/campus-ai
 
 # 4. Database (only if this database has not been migrated/seeded yet)
 sudo -u www-data npm run db:migrate
