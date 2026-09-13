@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { and, asc, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db.js';
-import { assignments, classes, conversations, messages } from '../schema.js';
+import { assignments, classes, conversations, enrollments, messages } from '../schema.js';
 import { requireUser } from '../auth.js';
 import { buildSystemPrompt, getAgentSettings, reply, replyStream } from '../agent.js';
-import { isUuid, notFound, requireString, wrap } from '../http.js';
+import { errorPayload, isUuid, notFound, requireString, wrap } from '../http.js';
 import { openSse } from '../sse.js';
+import { withUsageBudget } from '../usage.js';
 import { requireMember } from './classes.js';
 
 export const conversationsRouter = Router();
@@ -20,6 +21,10 @@ async function loadOwned(req) {
     .select({ c: conversations, cls: classes })
     .from(conversations)
     .innerJoin(classes, eq(classes.id, conversations.classId))
+    .innerJoin(
+      enrollments,
+      and(eq(enrollments.classId, conversations.classId), eq(enrollments.userId, conversations.userId))
+    )
     .where(and(eq(conversations.id, id), eq(conversations.userId, req.user.id)));
   if (!row) throw notFound('Conversation not found');
   return row;
@@ -88,10 +93,17 @@ async function startTurn(req) {
   return { c, cls, title, userMsg, history, upcoming, systemPrompt, message: body };
 }
 
-const storeAgentMessage = (conversationId, body) =>
+const storeAgentMessage = (conversationId, body, usage = null) =>
   db
     .insert(messages)
-    .values({ conversationId, sender: 'agent', body })
+    .values({
+      conversationId,
+      sender: 'agent',
+      body,
+      promptTokens: usage?.promptTokens ?? null,
+      completionTokens: usage?.completionTokens ?? null,
+      usageSource: usage?.source ?? null,
+    })
     .returning()
     .then(([m]) => m);
 
@@ -99,10 +111,14 @@ const storeAgentMessage = (conversationId, body) =>
 conversationsRouter.post(
   '/conversations/:conversationId/messages',
   wrap(async (req, res) => {
-    const turn = await startTurn(req);
-    const text = await reply(turn);
-    const agentMsg = await storeAgentMessage(turn.c.id, text);
-    res.status(201).json({ title: turn.title, messages: [turn.userMsg, agentMsg] });
+    return withUsageBudget(req.user.id, async ({ beforeModelCall, recordUsage }) => {
+      // Budget admission above happens before startTurn stores the user message.
+      const turn = await startTurn(req);
+      let usage = null;
+      const text = await reply({ ...turn, beforeModelCall, recordUsage, onUsage: (value) => { usage = value; } });
+      const agentMsg = await storeAgentMessage(turn.c.id, text, usage);
+      res.status(201).json({ title: turn.title, messages: [turn.userMsg, agentMsg] });
+    });
   })
 );
 
@@ -110,32 +126,45 @@ conversationsRouter.post(
 //   event: user   {title, message}        the stored user message
 //   event: delta  {text}                  a chunk of the agent's answer
 //   event: done   {message}               the stored agent message
-//   event: error  {error}                 the model failed; nothing was stored
+//   event: error  {error, code?, ...}      assistant generation/storage failed;
+//                                         the already-emitted user turn remains
 conversationsRouter.post(
   '/conversations/:conversationId/messages/stream',
   wrap(async (req, res) => {
-    const turn = await startTurn(req);
-    const sse = openSse(req, res);
-    sse.send('user', { title: turn.title, message: turn.userMsg });
+    return withUsageBudget(req.user.id, async ({ beforeModelCall, recordUsage }) => {
+      // Budget admission above happens before the user turn is inserted and
+      // before openSse commits a 200 response.
+      const turn = await startTurn(req);
+      const sse = openSse(req, res);
+      sse.send('user', { title: turn.title, message: turn.userMsg });
 
-    let text = '';
-    try {
-      for await (const delta of replyStream({ ...turn, signal: sse.signal })) {
-        text += delta;
-        sse.send('delta', { text: delta });
+      let text = '';
+      let usage = null;
+      try {
+        for await (const delta of replyStream({
+          ...turn,
+          signal: sse.signal,
+          beforeModelCall,
+          recordUsage,
+          onUsage: (value) => { usage = value; },
+        })) {
+          text += delta;
+          sse.send('delta', { text: delta });
+        }
+        const agentMsg = await storeAgentMessage(turn.c.id, text, usage);
+        sse.send('done', { message: agentMsg });
+      } catch (err) {
+        if (sse.signal.aborted) {
+          // Browser left mid-answer: keep generated output and its explicit
+          // reported/estimated usage metadata so reload remains consistent.
+          if (text.trim()) await storeAgentMessage(turn.c.id, text, usage).catch((e) => console.error(e));
+          return;
+        }
+        console.error('agent reply failed:', err.message);
+        sse.send('error', errorPayload(err));
+      } finally {
+        sse.close();
       }
-      const agentMsg = await storeAgentMessage(turn.c.id, text);
-      sse.send('done', { message: agentMsg });
-    } catch (err) {
-      if (sse.signal.aborted) {
-        // Browser left mid-answer: keep what was generated so the chat is not one-sided.
-        if (text.trim()) await storeAgentMessage(turn.c.id, text).catch((e) => console.error(e));
-        return;
-      }
-      console.error('agent reply failed:', err.message);
-      sse.send('error', { error: err.message ?? 'The assistant is unavailable right now' });
-    } finally {
-      sse.close();
-    }
+    });
   })
 );

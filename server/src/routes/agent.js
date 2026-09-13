@@ -4,8 +4,9 @@ import { db } from '../db.js';
 import { agentSettings, assignments, classes, enrollments } from '../schema.js';
 import { requireRole, requireUser } from '../auth.js';
 import { buildHelperPrompt, buildSystemPrompt, getAgentSettings, replyStream } from '../agent.js';
-import { forbidden, requireString, wrap } from '../http.js';
+import { errorPayload, forbidden, requireString, wrap } from '../http.js';
 import { openSse } from '../sse.js';
+import { withUsageBudget } from '../usage.js';
 import { requireMember } from './classes.js';
 
 export const agentRouter = Router();
@@ -73,32 +74,43 @@ agentRouter.post(
       .slice(-30)
       .map((m) => ({ sender: m.who, body: m.text.slice(0, 4000) }));
 
-    const upcoming = await db
-      .select({ code: classes.code, title: assignments.title, dueDate: assignments.dueDate })
-      .from(enrollments)
-      .innerJoin(classes, eq(classes.id, enrollments.classId))
-      .innerJoin(assignments, eq(assignments.classId, classes.id))
-      .where(and(eq(enrollments.userId, req.user.id), gte(assignments.dueDate, sql`current_date`)))
-      .orderBy(asc(assignments.dueDate))
-      .limit(20);
+    return withUsageBudget(req.user.id, async ({ beforeModelCall, recordUsage }) => {
+      const upcoming = await db
+        .select({ code: classes.code, title: assignments.title, dueDate: assignments.dueDate })
+        .from(enrollments)
+        .innerJoin(classes, eq(classes.id, enrollments.classId))
+        .innerJoin(assignments, eq(assignments.classId, classes.id))
+        .where(and(eq(enrollments.userId, req.user.id), gte(assignments.dueDate, sql`current_date`)))
+        .orderBy(asc(assignments.dueDate))
+        .limit(20);
 
-    const settings = await getAgentSettings();
-    const systemPrompt = buildHelperPrompt(settings.basePrompt, req.user, upcoming);
+      const settings = await getAgentSettings();
+      const systemPrompt = buildHelperPrompt(settings.basePrompt, req.user, upcoming);
 
-    const sse = openSse(req, res);
-    let text = '';
-    try {
-      for await (const delta of replyStream({ systemPrompt, upcoming, history, message, signal: sse.signal })) {
-        text += delta;
-        sse.send('delta', { text: delta });
+      // withUsageBudget has checked admission before SSE headers are opened.
+      const sse = openSse(req, res);
+      let text = '';
+      try {
+        for await (const delta of replyStream({
+          systemPrompt,
+          upcoming,
+          history,
+          message,
+          signal: sse.signal,
+          beforeModelCall,
+          recordUsage,
+        })) {
+          text += delta;
+          sse.send('delta', { text: delta });
+        }
+        if (!sse.signal.aborted) sse.send('done', { message: { sender: 'agent', body: text } });
+      } catch (err) {
+        if (sse.signal.aborted) return;
+        console.error('helper reply failed:', err.message);
+        sse.send('error', errorPayload(err));
+      } finally {
+        sse.close();
       }
-      if (!sse.signal.aborted) sse.send('done', { message: { sender: 'agent', body: text } });
-    } catch (err) {
-      if (sse.signal.aborted) return;
-      console.error('helper reply failed:', err.message);
-      sse.send('error', { error: err.message ?? 'The assistant is unavailable right now' });
-    } finally {
-      sse.close();
-    }
+    });
   })
 );

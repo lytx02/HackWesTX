@@ -69,9 +69,53 @@ export const isModelConfigured = llm.isConfigured;
 // Streams the agent's answer as text deltas. `history` is the stored messages
 // ({sender, body}); `message` is the new user turn. `signal` aborts the model
 // call when the client disconnects.
-export async function* replyStream({ cls, systemPrompt, upcoming = [], history = [], message, signal }) {
+export function estimateChatUsage(modelMessages, output = '') {
+  // Character-based estimates are deliberately labeled estimated. Dividing by
+  // three is conservative for typical English/code prompts without claiming to
+  // reproduce the deployment model's tokenizer.
+  const estimate = (text) => Math.max(1, Math.ceil(new TextEncoder().encode(text).length / 3));
+  return {
+    promptTokens: modelMessages.reduce((sum, item) => sum + estimate(item.content), 0),
+    completionTokens: estimate(output),
+    source: 'estimated',
+  };
+}
+
+export async function* replyStream({
+  cls,
+  systemPrompt,
+  upcoming = [],
+  history = [],
+  message,
+  signal,
+  beforeModelCall,
+  recordUsage,
+  onUsage,
+}) {
   if (llm.isConfigured()) {
-    yield* llm.streamChat(llm.toChatMessages(systemPrompt, history, message), { signal });
+    if (typeof beforeModelCall !== 'function' || typeof recordUsage !== 'function') {
+      throw new Error('Configured model calls require usage budget callbacks');
+    }
+    const modelMessages = llm.toChatMessages(systemPrompt, history, message);
+    await beforeModelCall();
+    let output = '';
+    let settled = false;
+    const settle = async (reported) => {
+      if (settled) return;
+      settled = true;
+      const usage = await recordUsage(reported ?? estimateChatUsage(modelMessages, output));
+      if (onUsage) await onUsage(usage);
+    };
+    try {
+      for await (const delta of llm.streamChat(modelMessages, { signal, onUsage: settle })) {
+        output += delta;
+        yield delta;
+      }
+    } finally {
+      // Covers missing terminal usage, abrupt provider failure, and browser
+      // disconnect. recordUsage is idempotently invoked once for this call.
+      if (!settled) await settle(null);
+    }
     return;
   }
   yield stubReply({ cls, upcoming, history, message });

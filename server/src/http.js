@@ -8,6 +8,18 @@ export class HttpError extends Error {
   }
 }
 
+// Shared by SSE routes now and by the central JSON error middleware when its
+// integration owner mounts the usage router. Keep quota metadata intact.
+export function errorPayload(err, fallback = 'The assistant is unavailable right now') {
+  return {
+    error: err?.message ?? fallback,
+    ...(err?.code ? { code: err.code } : {}),
+    ...(Number.isInteger(err?.status) ? { status: err.status } : {}),
+    ...(Number.isSafeInteger(err?.limit) ? { limit: err.limit } : {}),
+    ...(typeof err?.resetsAt === 'string' ? { resetsAt: err.resetsAt } : {}),
+  };
+}
+
 export const badRequest = (msg, code) => new HttpError(400, msg, code);
 export const unauthorized = (msg = 'Sign in required') => new HttpError(401, msg);
 export const forbidden = (msg = 'Not allowed') => new HttpError(403, msg);
