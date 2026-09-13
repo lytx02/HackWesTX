@@ -89,9 +89,9 @@ export function IconRail({ classes, themeName, onCycleTheme, onSignOut }) {
 export function CoursePanel({ classes, themeName, onCycleTheme, onSignOut }) {
   return (
     <>
-      <div className="brand brand-wordmark" title="Campus AI">
+      <div className="brand brand-wordmark" title="Chalk">
         <span className="brand-mark">C</span>
-        <span className="brand-name">Campus AI</span>
+        <span className="brand-name">Chalk</span>
       </div>
       <nav id="sidebar-nav" className="sidebar-nav" aria-label="Main">
         <NavLink to="/dashboard" className={rowClass}>

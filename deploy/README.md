@@ -41,6 +41,10 @@ git config --global --add safe.directory /opt/campus-ai
 # 4. Database (only if this database has not been migrated/seeded yet)
 npm run db:migrate
 npm run db:seed        # WIPES tables; skip if you have real data
+# Placeholder (non-Canvas) classes: list them, then delete with --yes. New users no
+# longer join them unless AUTO_ENROLL_PLACEHOLDERS=true is set in server/.env.
+npm run db:prune-placeholders
+npm run db:prune-placeholders -- --yes
 
 # 5. API service
 cp /opt/campus-ai/deploy/systemd/campus-ai-api.service /etc/systemd/system/

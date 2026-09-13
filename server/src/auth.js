@@ -65,9 +65,13 @@ async function institutionForDomain(domain) {
   return row ?? null;
 }
 
-// POC convenience: a brand-new user joins every existing class at their
-// institution so the dashboard is not empty. Remove once real enrollment exists.
+// Demo switch, off by default: with AUTO_ENROLL_PLACEHOLDERS=true a brand-new user
+// joins every non-Canvas (placeholder) class at their institution so the dashboard
+// is not empty. Real membership comes from Canvas sync or the Add class form.
+const AUTO_ENROLL_PLACEHOLDERS = process.env.AUTO_ENROLL_PLACEHOLDERS === 'true';
+
 async function autoEnroll(user, institution) {
+  if (!AUTO_ENROLL_PLACEHOLDERS) return;
   // Only hand-made/seeded classes; Canvas-imported ones belong to whoever imported them.
   const notImported = sql`${classes.canvasCourseId} is null`;
   const seeded = await db
