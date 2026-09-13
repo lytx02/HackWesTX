@@ -69,21 +69,72 @@ a { color: inherit; }
 .link-btn { background: none; border: none; padding: 0; color: var(--color-primary); text-decoration: underline; cursor: pointer; font-family: var(--font-ui); }
 .link-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* App shell / dashboard ------------------------------------------------ */
-.shell { display: grid; grid-template-columns: var(--layout-sidebar) 1fr; min-height: 100vh; }
+/* App shell / sidebar --------------------------------------------------- */
+/* data-sidebar on .shell: 'collapsed' = icon rail, 'expanded' = course panel. */
+.shell { display: grid; grid-template-columns: var(--layout-sidebar) 1fr; min-height: 100vh; transition: grid-template-columns var(--motion-base); }
+.shell[data-sidebar="expanded"] { grid-template-columns: min(var(--layout-sidebarWide), 70vw) 1fr; }
+@media (prefers-reduced-motion: reduce) { .shell { transition: none; } }
 .sidebar {
   background: var(--color-surface); border-right: 1px solid var(--color-border);
   display: flex; flex-direction: column; align-items: center; padding: var(--space-md) 0; gap: var(--space-sm);
   position: sticky; top: 0; height: 100vh;
 }
+.shell[data-sidebar="expanded"] .sidebar { align-items: stretch; padding: var(--space-md) var(--space-sm); }
 .sidebar .brand { font-family: var(--font-body); font-weight: 700; font-size: 1.2rem; margin-bottom: var(--space-md); color: var(--color-primary); }
+.sidebar .brand-wordmark { display: flex; align-items: center; gap: var(--space-sm); padding: 0 12px; }
+.sidebar .brand-name { font-size: 1rem; font-weight: 600; color: var(--color-text); white-space: nowrap; }
+
+/* Edge toggle: half over the sidebar border, top corner. */
+.sidebar-toggle {
+  position: absolute; top: 18px; right: -13px; z-index: 2; padding: 0;
+  width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-textMuted); box-shadow: var(--shadow-soft);
+  display: grid; place-items: center; font-size: 1.05rem; line-height: 1; cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast), transform var(--motion-fast);
+}
+.sidebar-toggle:hover { color: var(--color-primary); border-color: var(--color-primary); transform: scale(1.08); }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* Scrolls on its own so many courses never push Theme / Sign out off screen. */
+.sidebar-nav {
+  flex: 1; min-height: 0; width: 100%; overflow-y: auto; scrollbar-width: thin; padding: 4px 0;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-sm);
+}
+.shell[data-sidebar="expanded"] .sidebar-nav { align-items: stretch; padding: 4px; }
+
 .nav-btn {
   width: 48px; height: 48px; border-radius: var(--radius-md); border: none; background: transparent;
   display: grid; place-items: center; cursor: pointer; color: var(--color-textMuted); font-size: 1.25rem;
   transition: background var(--motion-fast), color var(--motion-fast);
 }
 .nav-btn:hover, .nav-btn.active { background: var(--color-surfaceAlt); color: var(--color-primary); }
-.sidebar .spacer { flex: 1; }
+.nav-row {
+  display: flex; align-items: center; gap: var(--space-sm); width: 100%; padding: 10px 12px;
+  border-radius: var(--radius-md); border: none; background: transparent; color: var(--color-textMuted);
+  font-family: var(--font-ui); font-size: .92rem; text-align: left; text-decoration: none; cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+.nav-row:hover, .nav-row.active { background: var(--color-surfaceAlt); color: var(--color-primary); }
+.nav-row .nav-icon { width: 22px; text-align: center; font-size: 1.1rem; flex: none; }
+.sidebar-heading { margin: 0; padding: var(--space-sm) 12px 2px; }
+.sidebar-empty { margin: 0; padding: 0 12px; font-size: .85rem; }
+
+/* Course block: color sliver across the top, then name, then course number. */
+.course-block {
+  display: flex; flex-direction: column; gap: 2px; padding: 0 0 10px; overflow: hidden;
+  border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text); text-decoration: none; font-family: var(--font-ui);
+  transition: border-color var(--motion-fast), background var(--motion-fast), transform var(--motion-fast);
+}
+.course-block::before { content: ''; display: block; height: 6px; margin-bottom: 8px; background: var(--block-accent, var(--color-primary)); }
+.course-block:hover { border-color: var(--color-primary); transform: translateY(-1px); }
+.course-block.active { background: var(--color-surfaceAlt); border-color: var(--color-primary); }
+.course-block:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.course-block-name {
+  padding: 0 12px; font-weight: 600; font-size: .92rem; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.course-block-code { padding: 0 12px; font-size: .74rem; color: var(--color-textMuted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .main { padding: var(--space-xl); max-width: var(--layout-maxWidth); width: 100%; margin: 0 auto; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: var(--space-lg); gap: var(--space-md); flex-wrap: wrap; }
 .page-head h1 { font-size: 2rem; }

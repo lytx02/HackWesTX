@@ -33,7 +33,7 @@ export const academic = {
     lift: '0 8px 24px rgba(30, 25, 10, 0.10)',
   },
   motion: { fast: '120ms ease', base: '220ms ease' },
-  layout: { sidebar: '72px', maxWidth: '1200px' },
+  layout: { sidebar: '72px', sidebarWide: '252px', maxWidth: '1200px' },
 };
 
 // Alternate preset to prove the styling is modular (dark, sans-serif).
