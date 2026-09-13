@@ -42,6 +42,15 @@ export default function AgentChat({
   const [error, setError] = useState(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
+  // Attachments picked with the + button (images / PDFs). Not sent anywhere yet.
+  const fileRef = useRef(null);
+  const [files, setFiles] = useState([]);
+
+  const addFiles = (e) => {
+    setFiles((f) => [...f, ...Array.from(e.target.files ?? [])]);
+    e.target.value = ''; // allow picking the same file again
+  };
+  const removeFile = (i) => setFiles((f) => f.filter((_, j) => j !== i));
 
   let log = controlled ? messages : local;
   if (controlled && !log.length && greeting) log = [{ who: 'agent', text: greeting }];
@@ -109,7 +118,23 @@ export default function AgentChat({
         {error && <div className="error">{error}</div>}
         <div ref={endRef} />
       </div>
+      {files.length > 0 && (
+        <div className="agent-attachments">
+          {files.map((f, i) => (
+            <span key={`${f.name}-${i}`} className="chip">
+              {f.name}
+              <button type="button" className="chip-remove" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <form className="agent-input" onSubmit={send}>
+        <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={addFiles} />
+        <button type="button" className="btn btn-ghost attach-btn" onClick={() => fileRef.current?.click()} title="Attach image or PDF" aria-label="Attach image or PDF">
+          +
+        </button>
         <textarea
           ref={inputRef}
           className="input"

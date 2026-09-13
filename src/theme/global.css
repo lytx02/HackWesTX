@@ -260,3 +260,9 @@ textarea.input { resize: vertical; font-family: var(--font-ui); }
 .usage-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--color-primary); transition: width var(--motion-base); }
 .usage-bar.warn .usage-fill { background: var(--color-accent); }
 .usage-bar.warn .usage-text { color: var(--color-accent); }
+
+/* Chat attachments (+ button) -------------------------------------------- */
+.attach-btn { flex: none; width: 40px; height: 40px; padding: 0; justify-content: center; font-size: 1.4rem; line-height: 1; border-radius: 50%; color: var(--color-agent); }
+.agent-attachments { display: flex; flex-wrap: wrap; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm) 0; }
+.agent-attachments .chip { display: inline-flex; align-items: center; gap: 4px; }
+.chip-remove { border: none; background: transparent; color: inherit; cursor: pointer; padding: 0; font-size: 1rem; line-height: 1; }
