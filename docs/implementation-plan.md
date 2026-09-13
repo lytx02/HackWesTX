@@ -285,3 +285,132 @@ Landed early from F's scope (2026-09-13) so the checkpoint works with Auth0:
 - `src/components/AgentChat.jsx` exports `describeChatError()`: quota errors show the API-provided limit and reset time in the viewer's locale, 409 and 401 get specific copy, and the unsent draft is kept.
 
 Remaining for F: DigestTile, usage query keys, and the instructor digest view. Remaining for G: mount `digestsRouter` when E delivers it.
+
+## 10. Agents D-G delivered (2026-09-13)
+
+Status: **implemented, tested, merged to `main`, and pushed.** Commit `0cf0564` ("Add daily summaries, instructor digests, digest UI, and summary timer (D-G)"), branched from `main` as `deepseek-agentD-G`. 21 files, +2534/-30. This section is the judge-facing summary and the engineering detail behind it.
+
+### 10.1 The pitch (what a judge should remember)
+
+Campus AI already answered questions in class chats. D-G closes the loop for teachers: **every night the system privately writes a de-identified, two-line summary of what each student's conversation was about and where they got stuck; when a professor opens a class, one click refreshes the week and turns those summaries into a ranked list of what to reteach.** It is grounded in real student activity, costs metered against each user's daily token allowance, and degrades safely (keeps the last good digest, never invents insights, never leaks names into the model output).
+
+Three properties that make it more than a prompt wrapper:
+
+1. **Grounded and anonymous.** The model only ever sees daily summaries, never raw chats, names, emails, IDs, or quotes. Contributors are labeled `Student A/B/C` locally; DB IDs never leave the server.
+2. **Budget-honest.** Summaries and digests run under the same `DAILY_TOKEN_LIMIT` gate as chat, with admission checks before every inference call, awaited settlement after it, and Central-midnight rollover. Nightly summaries are explicitly system cost.
+3. **Fail-safe.** Each run is persisted atomically only after validation; a failure keeps the previous digest and returns an actionable error. Unchanged days are skipped without a model call, so repeat generations are cheap.
+
+### 10.2 How the pieces fit
+
+```text
+student class chat (persisted messages)
+        │  nightly CLI (00:05 America/Chicago) or professor "Generate digest"
+        ▼
+[ D: summaries.js ]  summarizeDay(day, classId?)   ← student enrollments only
+        │  upsert one row / conversation / Central day (source watermark)
+        ▼
+conversation_daily_summaries  (internal only; never in chat or model context)
+        │  loadDigestSources(classId, startDay, endDay)  (7-day inclusive window)
+        ▼
+[ E: digests.js ]  generateDigest()  → rank 0-3 friction topics
+        │  atomic save of digest_runs + digest_items
+        ▼
+digest_runs / digest_items
+        │  GET /classes/:id/digest  (instructor only)
+        ▼
+[ F: DigestTile.jsx ]  ranked topics, window dates, last-generated, quota state
+        ▲
+        └── GET /ai/usage  [ C: usage.js ]  shared DAILY_TOKEN_LIMIT gate
+
+[ G ] mounts the routers, schedules the nightly timer, documents config.
+```
+
+Key idea: `conversation_daily_summaries` is the boundary. It is both the **storage** that lets a professor look back six days and the **privacy firewall** that keeps raw transcripts and PII out of digest prompts.
+
+### 10.3 Agent D — end-of-day conversation summaries
+
+Files: `server/src/summaries.js`, `server/src/summary-time.js`, `server/scripts/summarize-day.js`, `server/test/summaries.test.js`.
+
+- **Exports:** `summarizeDay({ day, classId?, signal, beforeModelCall?, recordUsage?, deps? }) -> { scanned, updated, skipped, failed }`; `loadDigestSources({ classId, startDay, endDay, deps? })`; `createSummariesService(defaultDeps)`; plus `validateSummary`, `redactIdentifiers`. From `summary-time.js`: `getDigestWindow`, `centralDayFor`, `isCentralDay`, `addDays`, `centralDayStartIso`, `centralDayEndIso`, `centralDayRange`, `previousCompletedCentralDay`.
+- **What it does:** for each student conversation with a user message on a Central day, snapshot the day's messages under deterministic `(createdAt, id)` order, redact emails/links/handles/phones/long digit runs, and ask the model for **exactly two nonempty lines**: topics/questions, then unresolved friction (or an explicit "no clear unresolved friction"). Output is validated and length-capped; invalid output is retried a bounded number of times, then counted `failed` with no write.
+- **Watermark & idempotency:** each row stores `sourceThroughAt` + `sourceThroughMessageId` for the last covered message and a `snapshotAt`. A rerun over unchanged input is `skipped` with **zero model calls**. Today's on-demand refresh and the later nightly run update the **same** `(conversationId, summaryDay)` row via `on conflict do update`. A conditional `setWhere` on `sourceThroughAt` prevents an older overlapping job from overwriting a newer snapshot.
+- **No dropped questions:** when a day exceeds the input bound it is chunked, each chunk summarized, then consolidated to two lines.
+- **Billing:** `beforeModelCall`/`recordUsage` are supplied for on-demand runs (charged to the professor) and omitted for nightly runs (system cost). Both are awaited once per inference call; quota errors stop the run immediately so Agent E can preserve the code. No DB transaction is held during inference.
+- **Timezone:** all day math uses `America/Chicago` via `Intl.DateTimeFormat` (DST-aware), mirroring `usage.js`; no fixed offset, no UTC `current_date`.
+- **CLI:** `scripts/summarize-day.js` supports `--day YYYY-MM-DD` and `--catch-up-days N` (default: previous completed Central day; catch-up scans the last N completed days after downtime).
+
+### 10.4 Agent E — instructor digest backend
+
+Files: `server/src/digests.js`, `server/src/routes/digests.js`, `server/src/routes/classes.js` (digest selection only), `server/test/digests.test.js`.
+
+- **Exports:** `generateDigest({ classId, generatedBy, signal, deps? }) -> { run, items }`; `getLatestDigest(classId)`; plus `validateDigestOutput`, `sanitizeDigestText`, `labelSources`, `chunkDigestSources`, `enumerateInclusiveDays`, `DigestError`. Router `digestsRouter` with `GET /classes/:classId/digest` and `POST /classes/:classId/digest/generate`.
+- **Flow:** acquire the per-class gate and the professor's usage gate once, freeze the Central 7-day window at request start, refresh today's changed conversations, catch up any missing/stale prior-six days (unchanged days skip without model calls), then build the digest under the same gate. Refreshes, chunk reductions, and the final call all bill the requesting professor.
+- **Ranking rules:** 0-3 items, strongest first; recurring unresolved difficulty outranks one-offs; **breadth across distinct students outranks repeated messages from one student**; fewer items beat padding; an empty list is valid and is persisted as a successful run with zero model tokens if there were no sources.
+- **Privacy/safety:** sources are labeled `Student A/B/C` from a request-local map; model output is treated as data, stripped of tags/control chars, length-capped, and validated for shape, nonempty fields, and unique topics.
+- **Consistency:** `digest_runs` + `digest_items` are inserted in one short transaction only after validation; any refresh or generation failure keeps the previous digest. Concurrent generation for one class returns 409 `digest_in_progress`. Public payloads expose only `{id, rank, topic, body, kind}` — never summaries, owner IDs, message IDs, or attribution.
+- **Route authorization:** both endpoints require a **class instructor enrollment** (a global instructor role is insufficient); `requireMember` resolves membership and non-members get 403.
+- **`classes.js` change:** `GET /classes/:classId` now returns `digest: []` for students and only the newest run's items for instructors (legacy seed items with null run IDs are no longer presented as generated insights).
+
+### 10.5 Agent F — digest and quota experience
+
+Files: `src/components/DigestTile.jsx` (new), `src/api/hooks.js`, `src/components/AgentChat.jsx`, `src/pages/instructor/InstructorClassView.jsx`, `src/theme/global.css`.
+
+- **Hooks/keys:** `keys.digest(classId)`, `keys.usage`; `useDigest(classId)`, `useUsage(enabled)`, `useGenerateDigest(classId)`. Generation invalidates digest + usage **on settle** (a failed generation may still have spent tokens).
+- **`DigestTile`:** Generate/Regenerate button with pending copy ("Summarizing this week's conversations..."); shows server-provided window dates, summary/student counts, last-generated time, and ranked topics; distinguishes never-generated, empty-but-successful, loading, quota-exceeded, and model failure; keeps the last successful digest on failure. Displays the server-provided allowance `limit` and formatted `resetsAt`; never hardcodes 50,000 or recomputes reset time.
+- **Error handling:** `describeChatError` covers quota (shows API limit + reset), `ai_request_in_progress`, `digest_in_progress`, 401 (session expired), and generic model errors; the shared async `resolveToken()` is used by both JSON and SSE transports, and `errorFromPayload` carries `code/status/limit/resetsAt` through pre-stream JSON and SSE `error` events. Unsent drafts are retained on rejection.
+- **Student chat:** history rendering preserved; summaries/digests are never shown in student chats.
+
+### 10.6 Agent G — integration, config, and deployment
+
+Files: `server/src/index.js`, `server/package.json`, `server/.env.example`, `README.md`, `deploy/README.md`, `deploy/systemd/campus-ai-summary.{service,timer}` (new), `server/test/integration.test.js` (new).
+
+- **App wiring:** mounts `digestsRouter` after `usageRouter`; exports `app` and a guarded `start()` so tests can import the assembled app without binding a port. The existing central error handler serializes `HttpError` via `errorPayload`, preserving quota metadata.
+- **Scripts:** `npm test` (`node --test "test/*.test.js"`), `npm run summary:day`, `npm run summary:catch-up`. No new runtime dependencies.
+- **Config/docs:** `.env.example` documents `VLLM_BASE_URL`/`VLLM_MODEL`/`VLLM_API_KEY`, input/context bounds, and `DAILY_TOKEN_LIMIT` semantics; explicitly says the served model id is deployment config and must never be guessed. README documents the new endpoints and the summaries/digests pipeline; `deploy/README.md` adds timer install, checking, and rollback steps.
+- **Nightly timer:** `campus-ai-summary.service` (`Type=oneshot`, repo at `/opt/campus-ai`, `ExecStart=node scripts/summarize-day.js --catch-up-days 7`) and `campus-ai-summary.timer` (`OnCalendar=*-*-* 00:05:00 America/Chicago`, `Persistent=true`) so a missed run recovers; the service's seven-day catch-up fills skipped dates. Allowance rollover is independent of the timer.
+- **Integration test:** imports the assembled `app`, asserts `/ai/usage`, `/classes/:id/digest`, and `/digest/generate` are mounted behind auth, then drives `generateDigest` end-to-end with injected dependencies to prove: seven-day refresh order, on-demand billing charged once to the professor, empty-source zero-token success, quota-code propagation with no run saved, and per-class concurrency rejection.
+
+### 10.7 Verification evidence
+
+- `cd server && npm test` → **75 pass, 1 skipped** (the skipped test is the disposable-DB schema/migration suite, which requires `TEST_DATABASE_URL`; Agent A verified it separately against a fresh and an upgraded disposable database).
+- `npm run build` (repo root) → Vite production build succeeds, 114 modules.
+- `server/test/integration.test.js` → 5/5 pass (app mounting + auth, seven-day refresh order, professor billing, empty digest, quota, concurrency).
+- `server/test/summaries.test.js` → 19/19; `server/test/digests.test.js` → 22/22; existing `usage`/`chat`/`llm` suites unchanged and passing.
+
+### 10.8 Known limits (be upfront with judges)
+
+- **No live RunPod or production-DB run was performed here.** All backend verification is mocked/disposable; the live model id must be supplied through `VLLM_MODEL`. The integration test uses the stub/configured env.
+- **Migration `0003` is not applied to the shared Vultr database by this work.** Apply it with backup via `npm run db:migrate`; never run `db:seed` on shared data.
+- **MVP metering is a request admission limit, not an exact GPU billing ceiling:** an admitted final call may finish slightly over the limit before later calls are rejected.
+- **De-identification is best-effort** (emails, links, handles, phones, long digit runs), not a guarantee against every contextual identifier.
+- Single API instance only: the class gate and user gate are in-process; there is no Redis or distributed queue.
+
+### 10.9 Suggested demo script (2 minutes)
+
+1. Sign in as a student, open a class chat, ask a question or two in a weak topic.
+2. Sign in as the instructor for that class, open the class, point at the **AI Digest** tile ("No digest yet").
+3. Click **Generate digest**: the tile shows the seven-day window, refreshed counts, and 1-3 ranked friction topics with concrete reteach suggestions.
+4. Click **Regenerate** and note it is fast because unchanged days are reused without new model calls.
+5. Show `GET /ai/usage` or the tile's allowance line: the generation was charged to the professor's shared daily allowance; hit the quota with a low `DAILY_TOKEN_LIMIT` to show the actionable reset message.
+6. Show the systemd timer / `npm run summary:catch-up` as the nightly, system-cost path that keeps tomorrow's digest grounded.
+
+### 10.10 Commands to reproduce
+
+```bash
+# setup
+npm install && (cd server && npm install)
+cp server/.env.example server/.env     # fill DATABASE_URL + vLLM credentials
+cd server && npm run db:migrate        # applies 0003 (back up first)
+
+# verify
+cd server && npm test                  # 75 pass / 1 skipped
+npm run build                          # repo root; Vite build
+
+# run
+cd server && npm run dev               # API :4000
+npm run dev                            # repo root; frontend :5173
+
+# nightly summaries
+cd server && npm run summary:day       # previous completed Central day
+cd server && npm run summary:catch-up  # last seven completed days
+```
