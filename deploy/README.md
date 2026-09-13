@@ -48,14 +48,18 @@ cd /opt/campus-ai && npm ci && npm run build
 mkdir -p /var/www/chalktexas.tech
 rsync -a --delete dist/ /var/www/chalktexas.tech/
 
-# 7. Nginx
+# 7. Nginx. If a Certbot-managed site for chalktexas.tech already exists
+#    (/etc/nginx/sites-enabled/chalktexas.tech.conf), do NOT add a second one:
+#    merge the /api/ and location / blocks from deploy/nginx/chalktexas.tech.conf
+#    into its HTTPS server block instead (the live server was set up this way).
+#    On a fresh box:
 cp /opt/campus-ai/deploy/nginx/chalktexas.tech.conf /etc/nginx/sites-available/chalktexas.tech
 ln -sf /etc/nginx/sites-available/chalktexas.tech /etc/nginx/sites-enabled/chalktexas.tech
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 curl -s http://chalktexas.tech/api/health  # expect {"ok":true,"db":"up"}
 
-# 8. HTTPS (DNS for chalktexas.tech must already point at this server)
+# 8. HTTPS (fresh box only; DNS for chalktexas.tech must already point here)
 apt install -y certbot python3-certbot-nginx
 certbot --nginx -d chalktexas.tech -d www.chalktexas.tech
 curl -s https://chalktexas.tech/api/health
