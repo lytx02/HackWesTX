@@ -93,9 +93,9 @@ export default function InstructorClassView({ data }) {
           </ul>
         </Tile>
 
-        <DigestTile classId={cls.id} />
+        <DigestTile classId={cls.id} span={8} />
 
-        <Tile title="Assignments" span={6}>
+        <Tile title="Assignments" span={4}>
           <div className="stack">
             <button type="button" className="box row-box new-chat" onClick={() => setShowCreate(true)}>
               <span className="plus">+</span>
