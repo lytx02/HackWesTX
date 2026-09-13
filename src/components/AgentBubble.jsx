@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import { useData } from '../state/DataContext.jsx';
 import { useSession } from '../state/SessionContext.jsx';
+import { useMe } from '../api/hooks.js';
 import { upcomingWeek } from '../data/week.js';
 import AgentChat from './AgentChat.jsx';
 
-// The "one big" helper agent: floating bubble available on every page.
-// Per-class "small" agents live in the class chat views.
+// The "one big" helper agent: floating bubble available on every page. It still
+// uses the client-side stub; per-class chats go through the API.
 export default function AgentBubble() {
   const [open, setOpen] = useState(false);
   const { session } = useSession();
-  const { assignments, classesFor } = useData();
-  const ids = new Set(classesFor(session.role).map((c) => c.id));
-  const { items, label } = upcomingWeek(assignments.filter((a) => ids.has(a.classId)));
+  const me = useMe();
+  const { items, label } = upcomingWeek(me.data?.assignments ?? []);
+  const upcoming = items.map((a) => ({ title: a.title, due: a.dueDate }));
 
   return (
     <>
@@ -25,9 +25,9 @@ export default function AgentBubble() {
           </header>
           <AgentChat
             scope="general"
-            context={{ upcoming: items, label }}
+            context={{ upcoming, label }}
             greeting={
-              session.role === 'instructor'
+              session?.user?.role === 'instructor'
                 ? 'Hi. Ask me what is due across your classes, or which class needs attention.'
                 : "Hi. Ask me what's due this week, or which class assistant to talk to."
             }

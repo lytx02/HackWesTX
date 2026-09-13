@@ -1,15 +1,21 @@
+import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useSession } from '../state/SessionContext.jsx';
-import { useData } from '../state/DataContext.jsx';
 import { useTheme } from '../theme/ThemeProvider.jsx';
+import { useMe } from '../api/hooks.js';
 import AgentBubble from './AgentBubble.jsx';
 
 // App frame: icon sidebar (Home, each class, theme, sign out) + page outlet + helper agent.
 export default function Shell() {
-  const { session, signOut } = useSession();
-  const { classesFor } = useData();
+  const { signOut } = useSession();
   const { name, setTheme, available } = useTheme();
   const navigate = useNavigate();
+  const me = useMe();
+
+  // An expired or revoked session token: drop it and go back to the landing page.
+  useEffect(() => {
+    if (me.error?.status === 401) signOut().then(() => navigate('/', { replace: true }));
+  }, [me.error, signOut, navigate]);
 
   const cycleTheme = () => {
     const i = available.indexOf(name);
@@ -23,7 +29,7 @@ export default function Shell() {
         <NavLink to="/dashboard" className={({ isActive }) => `nav-btn ${isActive ? 'active' : ''}`} title="Home">
           ⌂
         </NavLink>
-        {classesFor(session.role).map((c) => (
+        {(me.data?.classes ?? []).map((c) => (
           <NavLink
             key={c.id}
             to={`/class/${c.id}`}
@@ -40,10 +46,7 @@ export default function Shell() {
         <button
           type="button"
           className="nav-btn"
-          onClick={() => {
-            signOut();
-            navigate('/');
-          }}
+          onClick={() => signOut().then(() => navigate('/'))}
           title="Sign out"
         >
           ⏻
@@ -54,7 +57,6 @@ export default function Shell() {
         <Outlet />
       </main>
 
-      {/* Instructors get the general helper too; students additionally have per-class chats. */}
       <AgentBubble />
     </div>
   );

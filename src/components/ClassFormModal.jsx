@@ -3,18 +3,28 @@ import Modal from './Modal.jsx';
 
 // mode 'create' (instructor): Class Name, Course Number, Class Overview.
 // mode 'join' (student):      Class Name, Course Number.
+// `onSubmit` may be async; the modal stays open and shows the error if it throws.
 export default function ClassFormModal({ mode = 'create', onSubmit, onClose }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [overview, setOverview] = useState('');
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return setError('Class name is required.');
     if (!code.trim()) return setError('Course number is required.');
-    onSubmit({ name: name.trim(), code: code.trim(), overview: overview.trim() });
-    onClose();
+    setBusy(true);
+    setError(null);
+    try {
+      await onSubmit({ name: name.trim(), code: code.trim(), overview: overview.trim() });
+      onClose();
+    } catch (err) {
+      setError(err.message ?? 'Could not save the class.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -46,8 +56,8 @@ export default function ClassFormModal({ mode = 'create', onSubmit, onClose }) {
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary">
-            {mode === 'create' ? 'Create class' : 'Join class'}
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? 'Saving...' : mode === 'create' ? 'Create class' : 'Join class'}
           </button>
         </div>
       </form>

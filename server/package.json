@@ -1,0 +1,27 @@
+{
+  "name": "campus-ai-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --env-file-if-exists=.env src/seed.js",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "drizzle-orm": "^0.36.4",
+    "express": "^4.21.1",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.28.1"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.19.12": true
+  }
+}

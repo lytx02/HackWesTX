@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tile from '../../components/Tile.jsx';
 import AssignmentFormModal from '../../components/AssignmentFormModal.jsx';
-import { useData } from '../../state/DataContext.jsx';
+import { useCreateAssignment } from '../../api/hooks.js';
 import { fmtDate } from '../../data/week.js';
 
 const initials = (name) =>
@@ -16,17 +16,18 @@ const initials = (name) =>
 const KIND_LABEL = { alert: 'Struggling', suggestion: 'Suggestion', notice: 'Notice' };
 
 // Instructor Class View: performance, students, AI digest, assignments.
-export default function InstructorClassView({ cls }) {
+export default function InstructorClassView({ data }) {
   const navigate = useNavigate();
-  const { assignmentsFor, studentsFor, digests, dispatch } = useData();
   const [showCreate, setShowCreate] = useState(false);
+  const cls = data.class;
+  const createAssignment = useCreateAssignment(cls.id);
 
-  const all = assignmentsFor(cls.id);
+  const all = data.assignments;
   const graded = all.filter((a) => a.avg != null);
   const overall = graded.length ? Math.round(graded.reduce((s, a) => s + a.avg, 0) / graded.length) : null;
-  const roster = studentsFor(cls.id).sort((a, b) => b.avg - a.avg);
-  const digest = digests[cls.id] ?? [];
-  const byDueDesc = [...all].sort((a, b) => b.due.localeCompare(a.due));
+  const roster = [...data.roster].sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+  const digest = data.digest;
+  const byDueDesc = [...all].sort((a, b) => b.dueDate.localeCompare(a.dueDate));
 
   return (
     <>
@@ -55,7 +56,9 @@ export default function InstructorClassView({ cls }) {
               <span className="muted">Students</span>
             </div>
             <div className="stat">
-              <span className="value">{graded.length}/{all.length}</span>
+              <span className="value">
+                {graded.length}/{all.length}
+              </span>
               <span className="muted">Graded</span>
             </div>
           </div>
@@ -84,7 +87,7 @@ export default function InstructorClassView({ cls }) {
                   <div className="title">{s.name}</div>
                   <div className="muted">{s.email}</div>
                 </div>
-                <span className={`chip ${s.avg < 75 ? 'chip-accent' : ''}`}>{s.avg}%</span>
+                <span className={`chip ${s.avg != null && s.avg < 75 ? 'chip-accent' : ''}`}>{s.avg != null ? `${s.avg}%` : '—'}</span>
               </li>
             ))}
             {roster.length === 0 && <p className="muted">No students enrolled yet.</p>}
@@ -96,12 +99,12 @@ export default function InstructorClassView({ cls }) {
             <p className="muted">No insights yet. The agent will post here once there is activity.</p>
           ) : (
             <ul className="digest">
-              {digest.map((d, i) => (
-                <li key={i} className={`digest-item ${d.kind}`}>
+              {digest.map((d) => (
+                <li key={d.id} className={`digest-item ${d.kind}`}>
                   <span className={`chip ${d.kind === 'alert' ? 'chip-accent' : d.kind === 'suggestion' ? 'chip-agent' : ''}`}>
                     {KIND_LABEL[d.kind]}
                   </span>
-                  <p>{d.text}</p>
+                  <p>{d.body}</p>
                 </li>
               ))}
             </ul>
@@ -118,7 +121,10 @@ export default function InstructorClassView({ cls }) {
               <div key={a.id} className="box row-box static">
                 <div className="grow">
                   <div className="title">{a.title}</div>
-                  <div className="muted">due {fmtDate(a.due)}{a.details ? ` · ${a.details}` : ''}</div>
+                  <div className="muted">
+                    due {fmtDate(a.dueDate)}
+                    {a.details ? ` · ${a.details}` : ''}
+                  </div>
                 </div>
                 <span className={`chip ${a.avg == null ? '' : a.avg < 75 ? 'chip-accent' : ''}`}>
                   {a.avg == null ? 'not graded' : `${a.avg}% avg`}
@@ -129,12 +135,7 @@ export default function InstructorClassView({ cls }) {
         </Tile>
       </div>
 
-      {showCreate && (
-        <AssignmentFormModal
-          onClose={() => setShowCreate(false)}
-          onSubmit={(assignment) => dispatch({ type: 'ADD_ASSIGNMENT', assignment: { ...assignment, classId: cls.id } })}
-        />
-      )}
+      {showCreate && <AssignmentFormModal onClose={() => setShowCreate(false)} onSubmit={(body) => createAssignment.mutateAsync(body)} />}
     </>
   );
 }

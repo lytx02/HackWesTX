@@ -1,5 +1,6 @@
 // Week helpers: Monday-start weeks. Returns assignments for the current week,
-// or for next week if the current week has none.
+// or for next week if the current week has none. Assignments use `dueDate`
+// (YYYY-MM-DD) as returned by the API.
 
 const DAY = 86_400_000;
 
@@ -20,10 +21,10 @@ export function weekOf(assignments, weekStart) {
   const end = new Date(weekStart.getTime() + 7 * DAY);
   return assignments
     .filter((a) => {
-      const due = parseISO(a.due);
+      const due = parseISO(a.dueDate);
       return due >= weekStart && due < end;
     })
-    .sort((a, b) => a.due.localeCompare(b.due));
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 }
 
 export function upcomingWeek(assignments, today = new Date()) {

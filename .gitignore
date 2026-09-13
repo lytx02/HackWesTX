@@ -1,2 +1,8 @@
 node_modules
 dist
+
+# secrets
+.env
+.env.*
+!.env.example
+*.crt

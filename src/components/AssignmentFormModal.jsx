@@ -1,18 +1,28 @@
 import { useState } from 'react';
 import Modal from './Modal.jsx';
 
+// `onSubmit` may be async; the modal stays open and shows the error if it throws.
 export default function AssignmentFormModal({ onSubmit, onClose }) {
   const [title, setTitle] = useState('');
-  const [due, setDue] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [details, setDetails] = useState('');
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!title.trim()) return setError('Title is required.');
-    if (!due) return setError('Due date is required.');
-    onSubmit({ title: title.trim(), due, details: details.trim() });
-    onClose();
+    if (!dueDate) return setError('Due date is required.');
+    setBusy(true);
+    setError(null);
+    try {
+      await onSubmit({ title: title.trim(), dueDate, details: details.trim() });
+      onClose();
+    } catch (err) {
+      setError(err.message ?? 'Could not save the assignment.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -24,7 +34,7 @@ export default function AssignmentFormModal({ onSubmit, onClose }) {
         </div>
         <div className="field">
           <label htmlFor="as-due">Due date</label>
-          <input id="as-due" className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <input id="as-due" className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="as-details">Details</label>
@@ -35,8 +45,8 @@ export default function AssignmentFormModal({ onSubmit, onClose }) {
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary">
-            Create assignment
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? 'Saving...' : 'Create assignment'}
           </button>
         </div>
       </form>

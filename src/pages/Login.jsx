@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { institutions } from '../data/mock.js';
 import { useSession, validateAcademicEmail } from '../state/SessionContext.jsx';
 
 // Returning-user login. POC: any academic email + any password signs you in
-// with the chosen role, at the institution matching the email domain (or the first one).
+// with the chosen role through the API. Auth0 replaces this screen later.
 export default function Login() {
   const navigate = useNavigate();
   const { signIn } = useSession();
@@ -12,18 +11,22 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const err = validateAcademicEmail(email, null);
     if (err) return setError(err);
     if (!password) return setError('Enter your password.');
-    const domain = email.trim().toLowerCase().split('@')[1];
-    const inst =
-      institutions.find((i) => i.domains.some((d) => domain === d || domain.endsWith(`.${d}`))) ??
-      institutions[0];
-    signIn({ role, email: email.trim().toLowerCase(), institutionId: inst.id });
-    navigate('/dashboard', { replace: true });
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn({ role, email: email.trim().toLowerCase() });
+      navigate('/dashboard', { replace: true });
+    } catch (e2) {
+      setError(e2.message);
+      setBusy(false);
+    }
   };
 
   return (
@@ -63,8 +66,14 @@ export default function Login() {
           <label>Log in as</label>
           <div className="row">
             {['student', 'instructor'].map((r) => (
-              <button key={r} type="button" className="btn btn-sm" aria-pressed={role === r} onClick={() => setRole(r)}
-                style={role === r ? { background: 'var(--color-primary)', color: 'var(--color-primaryText)', borderColor: 'var(--color-primary)' } : undefined}>
+              <button
+                key={r}
+                type="button"
+                className="btn btn-sm"
+                aria-pressed={role === r}
+                onClick={() => setRole(r)}
+                style={role === r ? { background: 'var(--color-primary)', color: 'var(--color-primaryText)', borderColor: 'var(--color-primary)' } : undefined}
+              >
                 {r}
               </button>
             ))}
@@ -80,8 +89,8 @@ export default function Login() {
               Get started
             </button>
           </span>
-          <button type="submit" className="btn btn-primary">
-            Log in
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? 'Signing in...' : 'Log in'}
           </button>
         </div>
       </form>

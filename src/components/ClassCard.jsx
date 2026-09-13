@@ -7,7 +7,7 @@ export function ClassCard({ cls, subtitle }) {
     <button type="button" className="box class-box" onClick={() => navigate(`/class/${cls.id}`)} style={{ '--box-accent': cls.color }}>
       <span className="eyebrow">{cls.code}</span>
       <h3>{cls.name}</h3>
-      <span className="muted">{subtitle ?? cls.instructor}</span>
+      <span className="muted">{subtitle ?? cls.instructorName}</span>
     </button>
   );
 }

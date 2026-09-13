@@ -1,28 +1,21 @@
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import AgentChat from '../../components/AgentChat.jsx';
-import { useData } from '../../state/DataContext.jsx';
-
-const DEFAULT_TITLE = 'New conversation';
+import { ErrorNote, Loading } from '../../components/Status.jsx';
+import { useConversation, useSendMessage } from '../../api/hooks.js';
 
 // AI Helper Chat View: one large conversation. Header = Class Name — Topic.
 export default function ChatView() {
   const { classId, chatId } = useParams();
   const navigate = useNavigate();
-  const { classById, chats, assignmentsFor, dispatch } = useData();
+  const q = useConversation(chatId);
+  const send = useSendMessage(chatId, classId);
 
-  const cls = classById(classId);
-  const chat = chats.find((c) => c.id === chatId && c.classId === classId);
-  if (!cls || !chat) return <Navigate to={cls ? `/class/${cls.id}` : '/dashboard'} replace />;
+  if (q.isLoading) return <Loading label="Loading conversation..." />;
+  if (q.error?.status === 404) return <Navigate to={`/class/${classId}`} replace />;
+  if (q.error) return <ErrorNote error={q.error} retry={q.refetch} />;
 
-  const upcoming = assignmentsFor(cls.id).filter((a) => !a.done);
-
-  const append = (message) => {
-    dispatch({ type: 'ADD_MESSAGE', chatId: chat.id, message });
-    // First user message names an untitled conversation.
-    if (chat.title === DEFAULT_TITLE && message.who === 'user') {
-      dispatch({ type: 'RENAME_CHAT', chatId: chat.id, title: message.text.slice(0, 60) });
-    }
-  };
+  const { conversation: chat, class: cls, messages } = q.data;
+  const log = messages.map((m) => ({ who: m.sender, text: m.body }));
 
   return (
     <div className="chat-page">
@@ -40,10 +33,8 @@ export default function ChatView() {
 
       <div className="card chat-card">
         <AgentChat
-          scope="class"
-          context={{ cls, upcoming }}
-          messages={chat.messages}
-          onAppend={append}
+          messages={log}
+          onSend={(text) => send.mutateAsync(text)}
           greeting={`Hi, I'm ${cls.agentName}. What would you like to work through in ${cls.name}?`}
           placeholder="Type something..."
           autoFocus

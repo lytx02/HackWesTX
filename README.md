@@ -1,12 +1,21 @@
 # Campus AI (POC)
 
-React + Vite proof of concept. Everything is frontend-only for now: no backend, no real auth
-(Auth0 comes later). State lives in `localStorage`.
+React + Vite frontend with an Express + PostgreSQL (Vultr) backend in `server/`. Login is a
+temporary email + role handshake until Auth0 is added.
+
+Run both, in two terminals:
 
 ```bash
 npm install
-npm run dev
+npm run dev            # frontend on http://localhost:5173
 ```
+
+```bash
+cd server
+npm run dev            # API on http://localhost:4000 (needs server/.env, see Backend)
+```
+
+The frontend reads `VITE_API_URL` (default `http://localhost:4000`); copy `.env.example` to `.env` to change it.
 
 ## Flow
 
@@ -32,20 +41,51 @@ npm run dev
 
 A floating **Helper Agent** bubble is available on every signed-in page for both roles.
 
+## Backend (server/)
+
+Express + Drizzle + `pg` against PostgreSQL on Vultr. The frontend talks to it through `src/api/`.
+
+```bash
+cd server
+cp .env.example .env        # fill in DATABASE_URL with the PUBLIC host and the POOL port
+npm install
+npm run db:migrate          # applies server/drizzle/*.sql
+npm run db:seed             # loads src/data/mock.js; WIPES existing rows
+npm run dev                 # http://localhost:4000
+```
+
+Demo logins after seeding: `student@okstate.edu` (student) and `instructor@okstate.edu` (instructor).
+
+| Endpoint | Who | What |
+| --- | --- | --- |
+| `POST /auth/login` `{email, role}` | anyone | Creates the user on first login, returns `{token, user, institution}`. Temporary until Auth0. |
+| `POST /auth/logout` | signed in | Ends the session. |
+| `GET /me` | signed in | User, institution, their classes, announcements. |
+| `POST /classes` `{name, code, overview?}` | instructor creates, student joins by `code` | Returns the class. |
+| `GET /classes/:id` | member | Class, assignments (with class avg + your done flag), roster (instructors only), AI digest, your conversations. |
+| `POST /classes/:id/assignments` | instructor | Create assignment. |
+| `POST /assignments/:id/done` `{done}` | student | Mark done / not done. |
+| `POST /classes/:id/conversations` `{title?}` | member | New AI Helper chat. |
+| `GET /conversations/:id` | owner | Conversation + messages. |
+| `POST /conversations/:id/messages` `{body}` | owner | Stores your message, the agent replies in the same request. |
+| `PATCH /conversations/:id` `{title}` | owner | Rename. |
+
+Send the token as `Authorization: Bearer <token>`. Schema lives in `server/src/schema.js`; edit it, then `npm run db:generate` and `npm run db:migrate`.
+
 ## Code map
 
 | Path | What |
 | --- | --- |
 | `src/theme/tokens.js` | All fonts, colors, spacing, radii, shadows as presets. Turned into CSS variables by `ThemeProvider`. |
 | `src/theme/global.css` | Structure-only CSS that references the variables. |
-| `src/state/SessionContext.jsx` | Who is signed in (role, email, institution). |
-| `src/state/DataContext.jsx` | Classes, assignments, students, digests, chats. Reducer + `localStorage`. |
-| `src/data/mock.js` | Seed data. Bump `STORAGE_KEY` in `DataContext` when its shape changes. |
-| `src/agent/agent.js` | Canned agent stub. Replace `ask()` with a real model call. |
+| `src/state/SessionContext.jsx` | Who is signed in; `signIn`/`signOut` call the API and keep the token. |
+| `src/api/client.js`, `src/api/hooks.js` | Fetch wrapper + TanStack Query hooks (`useMe`, `useClass`, `useConversation`, mutations). |
+| `src/data/mock.js` | Seed data for `server/src/seed.js` and the institution dropdown. Not used for app state. |
+| `src/agent/agent.js` | Client-side stub used only by the floating helper bubble. Class chats go through the API. |
 | `src/pages/student/*`, `src/pages/instructor/*` | Role-specific views. |
 | `src/components/*` | Tiles, boxes, modals, chat surface, sidebar shell, helper bubble. |
 
 ## Not built yet
 
 - Instructor "Workspace" area from the sketch.
-- Real auth, backend, and the actual AI agent.
+- Real auth (Auth0), the real AI agent behind `server/src/agent.js`, and deploying the API next to the database on Vultr.

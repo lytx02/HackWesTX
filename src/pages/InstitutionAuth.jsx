@@ -12,6 +12,7 @@ export default function InstitutionAuth() {
   const [institutionId, setInstitutionId] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [step, setStep] = useState('form'); // form -> sent -> done
 
   const institution = institutions.find((i) => i.id === institutionId);
@@ -31,9 +32,17 @@ export default function InstitutionAuth() {
     setStep('sent'); // POC: pretend a magic link / code was sent
   };
 
-  const confirm = () => {
-    signIn({ role, email: email.trim().toLowerCase(), institutionId });
-    navigate('/dashboard', { replace: true });
+  // POC: "clicking the link" registers or signs in through the API.
+  const confirm = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await signIn({ role, email: email.trim().toLowerCase() });
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
   };
 
   return (
@@ -100,16 +109,15 @@ export default function InstitutionAuth() {
               <p>
                 We sent a verification link to <strong>{email}</strong>.
               </p>
-              <p className="muted">
-                POC mode: there is no real email yet. Click below to simulate opening the link.
-              </p>
+              <p className="muted">POC mode: there is no real email yet. Click below to simulate opening the link.</p>
             </div>
+            {error && <p className="error">{error}</p>}
             <div className="row between">
-              <button type="button" className="btn btn-ghost" onClick={() => setStep('form')}>
+              <button type="button" className="btn btn-ghost" onClick={() => setStep('form')} disabled={busy}>
                 Use a different email
               </button>
-              <button type="button" className="btn btn-primary" onClick={confirm}>
-                I clicked the link
+              <button type="button" className="btn btn-primary" onClick={confirm} disabled={busy}>
+                {busy ? 'Signing in...' : 'I clicked the link'}
               </button>
             </div>
           </>

@@ -4,24 +4,24 @@ import Tile from '../../components/Tile.jsx';
 import Announcements from '../../components/Announcements.jsx';
 import ClassFormModal from '../../components/ClassFormModal.jsx';
 import { AddBox, ClassCard } from '../../components/ClassCard.jsx';
-import { useData } from '../../state/DataContext.jsx';
-import { useSession } from '../../state/SessionContext.jsx';
+import { useCreateClass, useCreateConversation, useToggleDone } from '../../api/hooks.js';
 import { fmtDate, upcomingWeek } from '../../data/week.js';
 
-export default function StudentDashboard() {
+export default function StudentDashboard({ me }) {
   const navigate = useNavigate();
-  const { session, institution } = useSession();
-  const { classesFor, assignments, classById, dispatch, addChat } = useData();
   const [showJoin, setShowJoin] = useState(false);
+  const joinClass = useCreateClass();
+  const toggleDone = useToggleDone();
+  const newChat = useCreateConversation();
 
-  const myClasses = classesFor('student');
-  const myIds = new Set(myClasses.map((c) => c.id));
-  const { label, items } = upcomingWeek(assignments.filter((a) => myIds.has(a.classId)));
+  const { user, institution, classes, assignments, announcements } = me;
+  const classById = Object.fromEntries(classes.map((c) => [c.id, c]));
+  const { label, items } = upcomingWeek(assignments);
 
   // "AI help" on a task opens a new class chat seeded with that task as the topic.
-  const helpWith = (a) => {
-    const id = addChat(a.classId, a.title);
-    navigate(`/class/${a.classId}/chat/${id}`);
+  const helpWith = async (a) => {
+    const conv = await newChat.mutateAsync({ classId: a.classId, title: a.title });
+    navigate(`/class/${a.classId}/chat/${conv.id}`);
   };
 
   return (
@@ -32,12 +32,12 @@ export default function StudentDashboard() {
           <h1>Dashboard</h1>
         </div>
         <span className="muted">
-          {session.email} · <span className="chip">{session.role}</span>
+          {user.email} · <span className="chip">{user.role}</span>
         </span>
       </div>
 
       <div className="tiles">
-        <Announcements />
+        <Announcements items={announcements} />
 
         <Tile
           title="Classes"
@@ -49,7 +49,7 @@ export default function StudentDashboard() {
           }
         >
           <div className="box-grid">
-            {myClasses.map((c) => (
+            {classes.map((c) => (
               <ClassCard key={c.id} cls={c} />
             ))}
             <AddBox label="Add class" onClick={() => setShowJoin(true)} />
@@ -67,17 +67,18 @@ export default function StudentDashboard() {
                     type="checkbox"
                     className="checkbox"
                     checked={a.done}
-                    onChange={() => dispatch({ type: 'TOGGLE_DONE', id: a.id })}
+                    disabled={toggleDone.isPending}
+                    onChange={() => toggleDone.mutate({ id: a.id, done: !a.done })}
                     aria-label={`Mark ${a.title} done`}
                   />
                   <div className="grow">
                     <div className="title">{a.title}</div>
                     <div className="muted">
-                      <span className="swatch" style={{ background: classById(a.classId)?.color }} />
-                      {classById(a.classId)?.code} · due {fmtDate(a.due)}
+                      <span className="swatch" style={{ background: classById[a.classId]?.color }} />
+                      {classById[a.classId]?.code} · due {fmtDate(a.dueDate)}
                     </div>
                   </div>
-                  <button type="button" className="btn btn-sm btn-agent" onClick={() => helpWith(a)}>
+                  <button type="button" className="btn btn-sm btn-agent" disabled={newChat.isPending} onClick={() => helpWith(a)}>
                     AI help
                   </button>
                 </li>
@@ -88,11 +89,7 @@ export default function StudentDashboard() {
       </div>
 
       {showJoin && (
-        <ClassFormModal
-          mode="join"
-          onClose={() => setShowJoin(false)}
-          onSubmit={({ name, code }) => dispatch({ type: 'JOIN_CLASS', name, code })}
-        />
+        <ClassFormModal mode="join" onClose={() => setShowJoin(false)} onSubmit={({ name, code }) => joinClass.mutateAsync({ name, code })} />
       )}
     </>
   );

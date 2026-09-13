@@ -3,16 +3,13 @@ import Tile from '../../components/Tile.jsx';
 import Announcements from '../../components/Announcements.jsx';
 import ClassFormModal from '../../components/ClassFormModal.jsx';
 import { AddBox, ClassCard } from '../../components/ClassCard.jsx';
-import { useData } from '../../state/DataContext.jsx';
-import { useSession } from '../../state/SessionContext.jsx';
+import { useCreateClass } from '../../api/hooks.js';
 
 // Instructor dashboard: classes as tiles + Add Class popup.
-export default function InstructorDashboard() {
-  const { session, institution } = useSession();
-  const { classesFor, studentsFor, dispatch } = useData();
+export default function InstructorDashboard({ me }) {
   const [showCreate, setShowCreate] = useState(false);
-
-  const teaching = classesFor('instructor');
+  const createClass = useCreateClass();
+  const { user, institution, classes, announcements } = me;
 
   return (
     <>
@@ -22,12 +19,12 @@ export default function InstructorDashboard() {
           <h1>Your classes</h1>
         </div>
         <span className="muted">
-          {session.email} · <span className="chip">{session.role}</span>
+          {user.email} · <span className="chip">{user.role}</span>
         </span>
       </div>
 
       <div className="tiles">
-        <Announcements />
+        <Announcements items={announcements} />
 
         <Tile
           title="Classes"
@@ -39,8 +36,8 @@ export default function InstructorDashboard() {
           }
         >
           <div className="box-grid">
-            {teaching.map((c) => (
-              <ClassCard key={c.id} cls={c} subtitle={`${studentsFor(c.id).length} students · ${c.term}`} />
+            {classes.map((c) => (
+              <ClassCard key={c.id} cls={c} subtitle={`${c.studentCount ?? 0} students · ${c.term}`} />
             ))}
             <AddBox label="Add class" onClick={() => setShowCreate(true)} />
           </div>
@@ -48,13 +45,7 @@ export default function InstructorDashboard() {
       </div>
 
       {showCreate && (
-        <ClassFormModal
-          mode="create"
-          onClose={() => setShowCreate(false)}
-          onSubmit={({ name, code, overview }) =>
-            dispatch({ type: 'ADD_CLASS', role: 'instructor', name, code, overview, instructor: session.email })
-          }
-        />
+        <ClassFormModal mode="create" onClose={() => setShowCreate(false)} onSubmit={(body) => createClass.mutateAsync(body)} />
       )}
     </>
   );
