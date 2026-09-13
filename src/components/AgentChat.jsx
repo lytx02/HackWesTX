@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { streamHelper } from '../api/stream.js';
 
 // Reusable chat surface. Messages are { who: 'user' | 'agent', text, streaming? }.
@@ -41,6 +41,7 @@ export default function AgentChat({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const endRef = useRef(null);
+  const inputRef = useRef(null);
 
   let log = controlled ? messages : local;
   if (controlled && !log.length && greeting) log = [{ who: 'agent', text: greeting }];
@@ -50,6 +51,16 @@ export default function AgentChat({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [log.length, busy, log[log.length - 1]?.text.length]);
+
+  useLayoutEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    // Reset first so the composer can shrink again when text is removed.
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
+  }, [input]);
 
   const send = async (e) => {
     e?.preventDefault();
@@ -99,12 +110,14 @@ export default function AgentChat({
         <div ref={endRef} />
       </div>
       <form className="agent-input" onSubmit={send}>
-        <input
+        <textarea
+          ref={inputRef}
           className="input"
+          rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) send(e);
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) send(e);
           }}
           placeholder={placeholder}
           aria-label="Message"
